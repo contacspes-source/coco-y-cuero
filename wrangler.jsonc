@@ -1,0 +1,9 @@
+{
+  // Configuración para desplegar el sitio en Cloudflare.
+  // Es un sitio estático: no hay código de servidor, solo archivos.
+  "name": "coco-y-cuero",
+  "compatibility_date": "2026-10-19",
+  "assets": {
+    "directory": "./"
+  }
+}
