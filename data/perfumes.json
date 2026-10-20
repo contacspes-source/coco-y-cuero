@@ -1,0 +1,41 @@
+[
+  {
+    "id": "ejemplo-001",
+    "nombre": "EJEMPLO — cambia estos datos",
+    "marca": "Marca",
+    "categoria": "arabes",
+    "notas": "Vainilla, ámbar, cuero",
+    "imagen": "",
+    "disponible": true,
+    "tamanos": [
+      { "ml": 10, "precio": 350 },
+      { "ml": 100, "precio": 1890 }
+    ]
+  },
+  {
+    "id": "ejemplo-002",
+    "nombre": "EJEMPLO — perfume de nicho",
+    "marca": "Marca",
+    "categoria": "nicho",
+    "notas": "Coco, higo, madera de cedro",
+    "imagen": "",
+    "disponible": true,
+    "tamanos": [
+      { "ml": 10, "precio": 520 },
+      { "ml": 50, "precio": 2450 }
+    ]
+  },
+  {
+    "id": "ejemplo-003",
+    "nombre": "EJEMPLO — perfume de diseñador",
+    "marca": "Marca",
+    "categoria": "disenador",
+    "notas": "Mandarina, lavanda, haba tonka",
+    "imagen": "",
+    "disponible": true,
+    "tamanos": [
+      { "ml": 10, "precio": 290 },
+      { "ml": 100, "precio": 2100 }
+    ]
+  }
+]

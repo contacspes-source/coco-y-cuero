@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coco y Cuero · Perfumes árabes, nicho y diseñador</title>
+<meta name="description" content="Perfumes árabes, de nicho y de diseñador. Sobre pedido con entrega en Guadalajara, Zamora y Morelia, y envíos a todo México.">
+
+<meta property="og:title" content="Coco y Cuero · Perfumería">
+<meta property="og:description" content="Perfumes árabes, nicho y diseñador. Entregas en GDL, Zamora y Morelia.">
+<meta property="og:type" content="website">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/styles.css">
+
+<!-- PÍXEL DE META: pega aquí el código que te da Meta Business Suite cuando crees el píxel -->
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="logo" href="/">
+      <span class="logo-mark">C<span>y</span>C</span>
+      <span class="logo-text">Coco y Cuero</span>
+    </a>
+    <nav class="header-links">
+      <a href="#catalogo">Catálogo</a>
+      <a href="#como-funciona">Cómo funciona</a>
+      <a href="#autenticidad">Autenticidad</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap">
+    <p class="eyebrow">Guadalajara · Zamora · Morelia · Envíos a todo México</p>
+    <h1>Perfumes árabes, de nicho<br>y de diseñador.</h1>
+    <p class="lede">Catálogo amplio sobre pedido. Confirmamos existencia con el proveedor antes de cobrar, y te entregamos en punto de recolecta o a domicilio.</p>
+    <a class="btn btn-primary" href="#catalogo">Ver catálogo</a>
+  </div>
+</section>
+
+<main id="catalogo" class="wrap">
+
+  <div class="toolbar">
+    <div class="filters" role="tablist" aria-label="Categorías">
+      <button class="chip is-active" data-cat="todos" role="tab" aria-selected="true">Todos</button>
+      <button class="chip" data-cat="arabes" role="tab" aria-selected="false">Árabes</button>
+      <button class="chip" data-cat="nicho" role="tab" aria-selected="false">Nicho</button>
+      <button class="chip" data-cat="disenador" role="tab" aria-selected="false">Diseñador</button>
+    </div>
+    <label class="search">
+      <span class="sr-only">Buscar perfume</span>
+      <input type="search" id="buscador" placeholder="Buscar por nombre o marca…" autocomplete="off">
+    </label>
+  </div>
+
+  <p class="result-count" id="conteo" aria-live="polite"></p>
+
+  <div class="grid" id="grid"></div>
+
+  <p class="empty" id="vacio" hidden>No encontramos ese perfume en el catálogo. Escríbenos por WhatsApp y lo conseguimos.</p>
+
+  <p class="disclaimer">Todos los precios están sujetos a confirmación con el proveedor al momento del pedido. Los nombres y marcas mencionados pertenecen a sus respectivos titulares; Coco y Cuero es un revendedor independiente y no está afiliado a ninguna de estas casas de perfume.</p>
+</main>
+
+<section id="como-funciona" class="band">
+  <div class="wrap">
+    <h2>Cómo funciona</h2>
+    <ol class="steps">
+      <li><strong>Eliges tu perfume</strong><span>Nos escribes por WhatsApp con el nombre y el tamaño que quieres.</span></li>
+      <li><strong>Confirmamos existencia</strong><span>Verificamos con el proveedor y te damos precio final y fecha de entrega.</span></li>
+      <li><strong>Apartas con tu pago</strong><span>Efectivo, transferencia o depósito. Hasta entonces hacemos la compra.</span></li>
+      <li><strong>Recibes tu perfume</strong><span>Punto de recolecta en tu ciudad, entrega a domicilio o envío por paquetería con costo extra.</span></li>
+    </ol>
+  </div>
+</section>
+
+<section id="autenticidad" class="band band-alt">
+  <div class="wrap narrow">
+    <h2>¿Son originales?</h2>
+    <p>Sí. Trabajamos con distribuidores establecidos y revisamos cada pieza antes de entregarla: caja sellada, código de lote y atomizador. Si te interesa, te mandamos video del producto antes de la entrega.</p>
+    <p>Si alguna vez recibes una pieza que no corresponde a lo que pediste, la cambiamos o te devolvemos tu dinero.</p>
+    <a class="btn btn-ghost" id="wa-general" href="#">Preguntar por WhatsApp</a>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <div>
+      <p class="footer-brand">Coco y Cuero</p>
+      <p class="footer-small">Perfumería · Guadalajara, Zamora y Morelia</p>
+    </div>
+    <div class="footer-small">
+      <p><a href="#" id="wa-footer">WhatsApp</a> · <a href="#" id="ig-footer">Instagram</a> · <a href="#" id="fb-footer">Facebook</a></p>
+      <p>&copy; <span id="anio"></span> Coco y Cuero</p>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/app.js"></script>
+</body>
+</html>
