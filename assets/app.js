@@ -4,7 +4,7 @@
    =========================================================== */
 const CONFIG = {
   // Tu número con lada de país, sin + ni espacios. México = 52.
-  whatsapp: "521XXXXXXXXXX",
+  whatsapp: "522206172818",
   instagram: "https://instagram.com/cocoycuero",
   facebook: "https://facebook.com/cocoycuero"
 };
