@@ -19,7 +19,7 @@
     "nombre": "9pm Elixir Parfum Intense EDP 100 ml",
     "marca": "Afnan",
     "categoria": "arabes",
-    "notas": "Caballero",
+    "notas": "",
     "imagen": "assets/img/afnan-9pm-elixir-parfum-intense.jpg",
     "disponible": true,
     "tamanos": [
@@ -94,7 +94,7 @@
     "nombre": "Asad Elixir EDP 100 ml",
     "marca": "Lattafa",
     "categoria": "arabes",
-    "notas": "Caballero",
+    "notas": "",
     "imagen": "assets/img/lattafa-asad-elixir.jpg",
     "disponible": true,
     "tamanos": [
@@ -139,7 +139,7 @@
     "nombre": "His Confession EDP 100 ml",
     "marca": "Lattafa",
     "categoria": "arabes",
-    "notas": "Caballero",
+    "notas": "",
     "imagen": "assets/img/lattafa-his-confession.jpg",
     "disponible": true,
     "tamanos": [
@@ -169,7 +169,7 @@
     "nombre": "Khamrah Waha EDP 100 ml",
     "marca": "Lattafa",
     "categoria": "arabes",
-    "notas": "Unisex",
+    "notas": "",
     "imagen": "assets/img/lattafa-khamrah-waha.jpg",
     "disponible": true,
     "tamanos": [
@@ -184,7 +184,7 @@
     "nombre": "Yara EDP 100 ml",
     "marca": "Lattafa",
     "categoria": "arabes",
-    "notas": "Dama",
+    "notas": "",
     "imagen": "assets/img/lattafa-yara.jpg",
     "disponible": true,
     "tamanos": [
@@ -214,7 +214,7 @@
     "nombre": "Yara Elixir EDP 100 ml",
     "marca": "Lattafa",
     "categoria": "arabes",
-    "notas": "Dama",
+    "notas": "",
     "imagen": "assets/img/lattafa-yara-elixir.jpg",
     "disponible": true,
     "tamanos": [
@@ -229,7 +229,7 @@
     "nombre": "Go Mango Tropical Collection EDP 100 ml",
     "marca": "Odyssey (Armaf)",
     "categoria": "arabes",
-    "notas": "Unisex",
+    "notas": "",
     "imagen": "assets/img/odyssey-armaf-go-mango-tropical-collection.jpg",
     "disponible": true,
     "tamanos": [
@@ -259,7 +259,7 @@
     "nombre": "Mandarin Sky Elixir Limited Edition EDP 100 ml",
     "marca": "Odyssey (Armaf)",
     "categoria": "arabes",
-    "notas": "Unisex",
+    "notas": "",
     "imagen": "assets/img/odyssey-armaf-mandarin-sky-elixir-limited-edition.jpg",
     "disponible": true,
     "tamanos": [
@@ -274,7 +274,7 @@
     "nombre": "Mandarin Sky Vintage Edition EDP 100 ml",
     "marca": "Odyssey (Armaf)",
     "categoria": "arabes",
-    "notas": "Unisex",
+    "notas": "",
     "imagen": "assets/img/odyssey-armaf-mandarin-sky-vintage-edition.jpg",
     "disponible": true,
     "tamanos": [
@@ -289,7 +289,7 @@
     "nombre": "Marshmallow Gourmand Edition EDP 100 ml",
     "marca": "Odyssey (Armaf)",
     "categoria": "arabes",
-    "notas": "Unisex",
+    "notas": "",
     "imagen": "assets/img/odyssey-armaf-marshmallow-gourmand-edition.jpg",
     "disponible": true,
     "tamanos": [
@@ -319,7 +319,7 @@
     "nombre": "Hawas Elixir EDP 100 ml",
     "marca": "Rasasi",
     "categoria": "arabes",
-    "notas": "Unisex",
+    "notas": "",
     "imagen": "assets/img/rasasi-hawas-elixir.jpg",
     "disponible": true,
     "tamanos": [
@@ -349,7 +349,7 @@
     "nombre": "Hawas Tropical EDP 100 ml",
     "marca": "Rasasi",
     "categoria": "arabes",
-    "notas": "Caballero",
+    "notas": "",
     "imagen": "assets/img/rasasi-hawas-tropical.jpg",
     "disponible": true,
     "tamanos": [
@@ -379,7 +379,7 @@
     "nombre": "Stallion 53 (incluye travel 20 ml) EDP 100 ml",
     "marca": "Stallion",
     "categoria": "arabes",
-    "notas": "Unisex",
+    "notas": "",
     "imagen": "assets/img/stallion-stallion-53-incluye-travel-20-ml.jpg",
     "disponible": true,
     "tamanos": [
@@ -394,13 +394,13 @@
     "nombre": "Good Girl EDP 80 ml",
     "marca": "Carolina Herrera",
     "categoria": "disenador",
-    "notas": "Dama",
+    "notas": "",
     "imagen": "assets/img/carolina-herrera-good-girl.jpg",
     "disponible": true,
     "tamanos": [
       {
         "ml": 80,
-        "precio": 2550
+        "precio": 2920
       }
     ]
   },
@@ -415,7 +415,7 @@
     "tamanos": [
       {
         "ml": 80,
-        "precio": 2890
+        "precio": 3300
       }
     ]
   },
@@ -430,7 +430,7 @@
     "tamanos": [
       {
         "ml": 80,
-        "precio": 3010
+        "precio": 3440
       }
     ]
   },
@@ -439,13 +439,13 @@
     "nombre": "Good Girl Very Elixir EDP 80 ml",
     "marca": "Carolina Herrera",
     "categoria": "disenador",
-    "notas": "Dama",
+    "notas": "",
     "imagen": "assets/img/carolina-herrera-good-girl-very-elixir.jpg",
     "disponible": true,
     "tamanos": [
       {
         "ml": 80,
-        "precio": 3020
+        "precio": 3450
       }
     ]
   },
@@ -460,7 +460,7 @@
     "tamanos": [
       {
         "ml": 75,
-        "precio": 1340
+        "precio": 1530
       }
     ]
   },
@@ -475,7 +475,7 @@
     "tamanos": [
       {
         "ml": 100,
-        "precio": 1360
+        "precio": 1550
       }
     ]
   },
@@ -490,7 +490,7 @@
     "tamanos": [
       {
         "ml": 100,
-        "precio": 960
+        "precio": 1100
       }
     ]
   },
@@ -505,7 +505,7 @@
     "tamanos": [
       {
         "ml": 100,
-        "precio": 1010
+        "precio": 1150
       }
     ]
   },
@@ -535,7 +535,7 @@
     "tamanos": [
       {
         "ml": 125,
-        "precio": 2410
+        "precio": 2750
       }
     ]
   },
@@ -559,13 +559,13 @@
     "nombre": "Le Beau Narcisse EDP 125 ml",
     "marca": "Jean Paul Gaultier",
     "categoria": "disenador",
-    "notas": "Caballero",
+    "notas": "",
     "imagen": "assets/img/jean-paul-gaultier-le-beau-narcisse.jpg",
     "disponible": true,
     "tamanos": [
       {
         "ml": 125,
-        "precio": 2720
+        "precio": 3110
       }
     ]
   },
@@ -580,7 +580,7 @@
     "tamanos": [
       {
         "ml": 125,
-        "precio": 2570
+        "precio": 2940
       }
     ]
   },
@@ -595,7 +595,7 @@
     "tamanos": [
       {
         "ml": 125,
-        "precio": 2100
+        "precio": 2400
       }
     ]
   },
@@ -610,7 +610,7 @@
     "tamanos": [
       {
         "ml": 125,
-        "precio": 2880
+        "precio": 3290
       }
     ]
   },
@@ -625,7 +625,7 @@
     "tamanos": [
       {
         "ml": 100,
-        "precio": 2400
+        "precio": 2740
       }
     ]
   },
@@ -640,7 +640,7 @@
     "tamanos": [
       {
         "ml": 100,
-        "precio": 2630
+        "precio": 3000
       }
     ]
   },
@@ -649,13 +649,13 @@
     "nombre": "Scandal Intense EDP 100 ml",
     "marca": "Jean Paul Gaultier",
     "categoria": "disenador",
-    "notas": "Caballero",
+    "notas": "",
     "imagen": "assets/img/jean-paul-gaultier-scandal-intense.jpg",
     "disponible": true,
     "tamanos": [
       {
         "ml": 100,
-        "precio": 2430
+        "precio": 2780
       }
     ]
   },
@@ -670,7 +670,7 @@
     "tamanos": [
       {
         "ml": 100,
-        "precio": 340
+        "precio": 390
       }
     ]
   },
@@ -685,7 +685,7 @@
     "tamanos": [
       {
         "ml": 100,
-        "precio": 2030
+        "precio": 2320
       }
     ]
   },
@@ -700,7 +700,7 @@
     "tamanos": [
       {
         "ml": 100,
-        "precio": 2400
+        "precio": 2740
       }
     ]
   },
@@ -715,7 +715,7 @@
     "tamanos": [
       {
         "ml": 100,
-        "precio": 2380
+        "precio": 2720
       }
     ]
   },
@@ -730,7 +730,7 @@
     "tamanos": [
       {
         "ml": 100,
-        "precio": 2040
+        "precio": 2330
       }
     ]
   },
@@ -745,7 +745,7 @@
     "tamanos": [
       {
         "ml": 90,
-        "precio": 1550
+        "precio": 1770
       }
     ]
   },
@@ -760,7 +760,7 @@
     "tamanos": [
       {
         "ml": 100,
-        "precio": 1750
+        "precio": 2000
       }
     ]
   },
@@ -775,7 +775,7 @@
     "tamanos": [
       {
         "ml": 100,
-        "precio": 1450
+        "precio": 1660
       }
     ]
   },
@@ -790,7 +790,7 @@
     "tamanos": [
       {
         "ml": 100,
-        "precio": 1460
+        "precio": 1670
       }
     ]
   }
