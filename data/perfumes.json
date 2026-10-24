@@ -400,7 +400,7 @@
     "tamanos": [
       {
         "ml": 80,
-        "precio": 3190
+        "precio": 2550
       }
     ]
   },
@@ -415,7 +415,7 @@
     "tamanos": [
       {
         "ml": 80,
-        "precio": 3610
+        "precio": 2890
       }
     ]
   },
@@ -430,7 +430,7 @@
     "tamanos": [
       {
         "ml": 80,
-        "precio": 3760
+        "precio": 3010
       }
     ]
   },
@@ -445,7 +445,7 @@
     "tamanos": [
       {
         "ml": 80,
-        "precio": 3780
+        "precio": 3020
       }
     ]
   },
@@ -460,7 +460,7 @@
     "tamanos": [
       {
         "ml": 75,
-        "precio": 1670
+        "precio": 1340
       }
     ]
   },
@@ -475,7 +475,7 @@
     "tamanos": [
       {
         "ml": 100,
-        "precio": 1700
+        "precio": 1360
       }
     ]
   },
@@ -490,7 +490,7 @@
     "tamanos": [
       {
         "ml": 100,
-        "precio": 1210
+        "precio": 960
       }
     ]
   },
@@ -505,7 +505,7 @@
     "tamanos": [
       {
         "ml": 100,
-        "precio": 1260
+        "precio": 1010
       }
     ]
   },
@@ -535,7 +535,7 @@
     "tamanos": [
       {
         "ml": 125,
-        "precio": 3010
+        "precio": 2410
       }
     ]
   },
@@ -565,7 +565,7 @@
     "tamanos": [
       {
         "ml": 125,
-        "precio": 3400
+        "precio": 2720
       }
     ]
   },
@@ -580,7 +580,7 @@
     "tamanos": [
       {
         "ml": 125,
-        "precio": 3220
+        "precio": 2570
       }
     ]
   },
@@ -595,7 +595,7 @@
     "tamanos": [
       {
         "ml": 125,
-        "precio": 2630
+        "precio": 2100
       }
     ]
   },
@@ -610,7 +610,7 @@
     "tamanos": [
       {
         "ml": 125,
-        "precio": 3600
+        "precio": 2880
       }
     ]
   },
@@ -625,7 +625,7 @@
     "tamanos": [
       {
         "ml": 100,
-        "precio": 3000
+        "precio": 2400
       }
     ]
   },
@@ -640,7 +640,7 @@
     "tamanos": [
       {
         "ml": 100,
-        "precio": 3290
+        "precio": 2630
       }
     ]
   },
@@ -655,7 +655,7 @@
     "tamanos": [
       {
         "ml": 100,
-        "precio": 3040
+        "precio": 2430
       }
     ]
   },
@@ -670,7 +670,7 @@
     "tamanos": [
       {
         "ml": 100,
-        "precio": 430
+        "precio": 340
       }
     ]
   },
@@ -685,7 +685,7 @@
     "tamanos": [
       {
         "ml": 100,
-        "precio": 2540
+        "precio": 2030
       }
     ]
   },
@@ -700,7 +700,7 @@
     "tamanos": [
       {
         "ml": 100,
-        "precio": 3000
+        "precio": 2400
       }
     ]
   },
@@ -715,7 +715,7 @@
     "tamanos": [
       {
         "ml": 100,
-        "precio": 2970
+        "precio": 2380
       }
     ]
   },
@@ -730,7 +730,7 @@
     "tamanos": [
       {
         "ml": 100,
-        "precio": 2540
+        "precio": 2040
       }
     ]
   },
@@ -745,7 +745,7 @@
     "tamanos": [
       {
         "ml": 90,
-        "precio": 1930
+        "precio": 1550
       }
     ]
   },
@@ -760,7 +760,7 @@
     "tamanos": [
       {
         "ml": 100,
-        "precio": 2190
+        "precio": 1750
       }
     ]
   },
@@ -775,7 +775,7 @@
     "tamanos": [
       {
         "ml": 100,
-        "precio": 1820
+        "precio": 1450
       }
     ]
   },
@@ -790,7 +790,7 @@
     "tamanos": [
       {
         "ml": 100,
-        "precio": 1820
+        "precio": 1460
       }
     ]
   }
