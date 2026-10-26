@@ -35,6 +35,8 @@ supabase/
 | 008_panel_admin | Bucket de fotos, regla precio/costo al confirmar, funciones `guardar_perfume` y `actualizar_precios` |
 | 009_restaurar_modo_diferido | Corrige un error de la 008 encontrado en pruebas |
 | 010_catalogo_publico | Vista de solo lectura que consume el sitio: publicados, sin costos |
+| 011_clientes_y_pedidos | Descripción del perfume, historial de estados, nota interna, vista `pedido_detalle`, funciones para que el cliente aparte y cancele, lista de clientes para el panel |
+| 012_presentacion_en_catalogo | La vista pública incluye el id de cada tamaño (lo necesita "Apartar") |
 
 La 003, la 006 y la 009 corrigen errores de las anteriores. Se dejan así a propósito: una migración ya aplicada no se edita, se corrige con otra nueva. Así el historial cuenta lo que realmente pasó.
 
@@ -66,7 +68,7 @@ Es a propósito que no se pueda hacer desde la aplicación: ni tú ni nadie pued
 
 Pega `pruebas/seguridad.sql` completo en el SQL Editor y ejecútalo. Corre dentro de una transacción que se revierte, así que no deja datos.
 
-**Resultado esperado: 37 de 37 en OK.** Si alguna dice FALLA, no publiques el cambio.
+**Resultado esperado: 49 de 49 en OK.** Si alguna dice FALLA, no publiques el cambio.
 
 ## Números
 
@@ -76,5 +78,40 @@ Pega `pruebas/seguridad.sql` completo en el SQL Editor y ejecútalo. Corre dentr
 | Perfumes cargados | 53 |
 | Precios por debajo del costo | 0 |
 | Margen promedio sobre costo real | 47% |
-| Pruebas de seguridad | 37 de 37 |
+| Pruebas de seguridad | 49 de 49 |
 | Avisos de seguridad de Supabase | 0 |
+
+## Avisos del auditor que se aceptan a propósito
+
+El auditor de Supabase marca tres funciones `SECURITY DEFINER` que un usuario con sesión puede llamar. Es intencional y está probado:
+
+| Función | Por qué necesita permisos elevados | Qué la protege |
+| --- | --- | --- |
+| `solicitar_pedido` | El cliente no puede escribir en `pedido` directamente | Toma el precio de la base, fuerza estado "consultado" y anticipo 0, máximo 5 solicitudes abiertas (pruebas 40–44) |
+| `cancelar_mi_pedido` | Igual | Solo pedidos propios y solo en "consultado" (pruebas 47, 49, 50) |
+| `clientes_admin` | Lee el correo, que vive en `auth.users` | Rechaza a quien no es admin (prueba 48) |
+
+## Correos de la cuenta (confirmación y contraseña)
+
+El servicio de correo que trae Supabase **solo envía a los miembros de tu equipo** en Supabase y tiene un límite muy bajo por hora. Para que tus clientes reciban el correo de confirmación hay que conectar un servicio propio (SMTP), por ejemplo Resend o Brevo, con el dominio cocoycuero.com. Mientras no esté, el registro le muestra al cliente un mensaje para pedir por WhatsApp.
+
+Plantilla sugerida (Authentication → Emails → Confirm signup):
+
+```
+Asunto: Confirma tu cuenta de Coco & Cuero
+
+<h2>¡Bienvenido a Coco & Cuero!</h2>
+<p>Confirma tu correo para apartar perfumes y seguir tus pedidos:</p>
+<p><a href="{{ .ConfirmationURL }}">Confirmar mi cuenta</a></p>
+<p>Si no creaste una cuenta, ignora este correo.</p>
+```
+
+Y para Reset password:
+
+```
+Asunto: Crea tu contraseña nueva
+
+<p>Pediste cambiar tu contraseña de Coco & Cuero.</p>
+<p><a href="{{ .ConfirmationURL }}">Crear contraseña nueva</a></p>
+<p>Si no fuiste tú, ignora este correo.</p>
+```

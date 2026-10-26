@@ -11,6 +11,7 @@ import type { ProblemaDeCampo } from "./errores";
 
 export const ML_MAXIMO = 1000;
 export const PRECIO_MAXIMO = 200_000;
+export const LARGO_DESCRIPCION = 1200;
 
 export function validarPerfume(p: PerfumeEditable): ProblemaDeCampo[] {
   const problemas: ProblemaDeCampo[] = [];
@@ -19,6 +20,7 @@ export function validarPerfume(p: PerfumeEditable): ProblemaDeCampo[] {
   if (p.marca.trim().length < 2) agregar("marca", "Escribe la marca.");
   if (p.nombre.trim().length < 2) agregar("nombre", "Escribe el nombre del perfume.");
   if (p.nombre.trim().length > 120) agregar("nombre", "El nombre es demasiado largo.");
+  if ((p.descripcion ?? "").length > LARGO_DESCRIPCION) agregar("descripcion", `La descripción admite hasta ${LARGO_DESCRIPCION} caracteres.`);
   if (!TIPOS_PERFUME.includes(p.tipo)) agregar("tipo", "Elige un tipo válido.");
   if (!(p.generoId > 0)) agregar("genero", "Elige el género.");
   if (!(p.categoriaId > 0)) agregar("categoria", "Elige la categoría.");
@@ -63,6 +65,7 @@ export function normalizar(p: PerfumeEditable): PerfumeEditable {
     marca: limpiar(p.marca),
     nombre: limpiar(p.nombre),
     imagenUrl: p.imagenUrl?.trim() || null,
+    descripcion: p.descripcion?.trim() || null,
     notas: [...new Set(p.notas)].sort((a, b) => a - b),
     presentaciones: [...p.presentaciones].sort((a, b) => a.ml - b.ml),
   };

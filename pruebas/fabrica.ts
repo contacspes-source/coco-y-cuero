@@ -33,6 +33,7 @@ export function perfume(parcial: Partial<Perfume> = {}): Perfume {
     imagenUrl: "https://ejemplo.mx/foto.webp",
     publicado: true,
     notas: [],
+    descripcion: null,
     actualizadoEn: "2026-10-26T00:00:00Z",
     presentaciones: [{ id: id * 10, ml: 100, precioVenta: 1000, costo: 500 }],
     ...parcial,

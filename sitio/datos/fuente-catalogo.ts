@@ -18,7 +18,8 @@ export interface FilaCatalogo {
   genero: string;
   categoria: string;
   imagen_url: string | null;
-  presentaciones: { ml: number; precio: number | string }[] | null;
+  descripcion?: string | null;
+  presentaciones: { id?: number; ml: number; precio: number | string }[] | null;
   notas: { nota: string; familia: string | null }[] | null;
 }
 
@@ -51,8 +52,9 @@ export function aPerfume(f: FilaCatalogo): PerfumePublico | null {
     genero: f.genero,
     categoria: f.categoria as ClaveCategoria,
     imagenUrl: f.imagen_url,
+    descripcion: f.descripcion?.trim() || null,
     presentaciones: (f.presentaciones ?? [])
-      .map((p) => ({ ml: Number(p.ml), precio: Number(p.precio) }))
+      .map((p) => ({ id: typeof p.id === "number" ? p.id : null, ml: Number(p.ml), precio: Number(p.precio) }))
       .filter((p) => p.ml > 0 && p.precio > 0),
     notas: f.notas ?? [],
   };

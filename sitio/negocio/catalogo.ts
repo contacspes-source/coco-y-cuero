@@ -186,3 +186,94 @@ export function escribirFiltros(f: Filtros): string {
   const s = q.toString();
   return s ? `?${s}` : "";
 }
+
+// ------------------------------------------------------------------
+// Detalle del perfume
+// ------------------------------------------------------------------
+
+export const TIPO_LARGO: Record<string, string> = {
+  EDT: "Eau de Toilette",
+  EDP: "Eau de Parfum",
+  Parfum: "Parfum",
+  Extrait: "Extrait de Parfum",
+  Colonia: "Eau de Cologne",
+};
+
+const PARA: Record<string, string> = { caballero: "para caballero", dama: "para dama", unisex: "unisex" };
+const ADJETIVO: Record<ClaveCategoria, string> = { arabes: "árabe", nicho: "de nicho", disenador: "de diseñador" };
+
+/**
+ * La descripción que escribiste en el panel; si no hay, una frase
+ * armada con sus datos reales (nunca se inventan notas).
+ */
+export function descripcionDe(p: PerfumePublico): string {
+  if (p.descripcion) return p.descripcion;
+  const base = `${TIPO_LARGO[p.tipo] ?? "Perfume"} ${ADJETIVO[p.categoria] ?? ""} ${PARA[p.genero] ?? ""} de ${p.marca}`
+    .replace(/\s+/g, " ")
+    .trim();
+  const notas = p.notas.map((n) => n.nota);
+  if (notas.length === 0) return `${capitalizar(base)}.`;
+  const lista = notas.length === 1 ? notas[0] : `${notas.slice(0, -1).join(", ")} y ${notas.at(-1)}`;
+  return `${capitalizar(base)}, con notas de ${lista}.`;
+}
+
+/** Notas agrupadas por familia, en el orden de FAMILIAS. */
+export function notasPorFamilia(p: PerfumePublico): { familia: string; clave: string; notas: string[] }[] {
+  const grupos = new Map<string, string[]>();
+  for (const n of p.notas) {
+    const f = n.familia ?? "Otras notas";
+    grupos.set(f, [...(grupos.get(f) ?? []), n.nota]);
+  }
+  const orden = (f: string) => {
+    const i = FAMILIAS.findIndex((x) => x.nombre === f);
+    return i < 0 ? 99 : i;
+  };
+  return [...grupos]
+    .sort((a, b) => orden(a[0]) - orden(b[0]))
+    .map(([familia, notas]) => ({ familia, clave: claveDeFamilia(familia), notas }));
+}
+
+/**
+ * Perfumes parecidos para "También te puede gustar": mismo género
+ * (o unisex) y que compartan familias; desempata la categoría y el
+ * precio más cercano.
+ */
+export function similares(p: PerfumePublico, todos: PerfumePublico[], cuantos = 4): PerfumePublico[] {
+  const propias = familiasDe(p);
+  const precio = precioDesde(p) ?? 0;
+  return todos
+    .filter((o) => o.id !== p.id && (o.genero === p.genero || o.genero === "unisex" || p.genero === "unisex"))
+    .map((o) => {
+      const comunes = familiasDe(o).filter((f) => propias.includes(f)).length;
+      const puntos =
+        comunes * 10 +
+        (familiaPrincipal(o) !== null && familiaPrincipal(o) === familiaPrincipal(p) ? 5 : 0) +
+        (o.categoria === p.categoria ? 3 : 0) -
+        Math.abs((precioDesde(o) ?? 0) - precio) / 1000;
+      return { o, puntos, comunes };
+    })
+    // si el perfume tiene notas, el parecido debe compartir algún aroma;
+    // si no tiene, basta con la misma categoría
+    .filter((x) => (propias.length ? x.comunes > 0 : x.puntos > 0))
+    .sort((a, b) => b.puntos - a.puntos)
+    .slice(0, cuantos)
+    .map((x) => x.o);
+}
+
+export function mensajeWhatsAppTamano(p: PerfumePublico, ml: number): string {
+  return `Hola, me interesa ${p.nombre} de ${p.marca} en ${ml} ml. ¿Lo tienen disponible?`;
+}
+
+/** ?perfume=12 abre el detalle; así se puede compartir o anunciar. */
+export function leerPerfumeAbierto(busqueda: string): number | null {
+  const n = Number(new URLSearchParams(busqueda).get("perfume"));
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+
+export function conPerfume(busquedaActual: string, id: number | null): string {
+  const q = new URLSearchParams(busquedaActual);
+  if (id === null) q.delete("perfume");
+  else q.set("perfume", String(id));
+  const s = q.toString();
+  return s ? `?${s}` : "";
+}

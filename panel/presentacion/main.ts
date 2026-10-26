@@ -4,13 +4,15 @@
  * sirve el mismo panel/index.html.
  */
 import "../estilos.css";
-import { mensajeDe } from "../negocio/errores";
-import { estado, recargar, servicios } from "./estado";
+import { esDeSesion, mensajeDe } from "../negocio/errores";
+import { estado, recargar, recargarVentas, servicios } from "./estado";
 import { avisar, cargando, confirmar, h, vaciar } from "./ui";
 import { vistaLogin, vistaNuevaContrasena } from "./vistas/acceso";
 import { vistaCatalogo } from "./vistas/catalogo";
 import { vistaFormulario } from "./vistas/formulario";
 import { vistaPrecios } from "./vistas/precios";
+import { vistaCliente, vistaClientes } from "./vistas/clientes";
+import { vistaNuevoPedido, vistaPedido, vistaPedidos } from "./vistas/pedidos";
 
 const raiz = document.getElementById("app")!;
 
@@ -68,7 +70,14 @@ function pintarMarco() {
         h("img", { src: "/assets/img/logo-marca.png", alt: "", width: 38, height: 38 }),
         h("span", null, "Coco & Cuero", h("small", null, "Panel")),
       ),
-      h("nav", { clase: "navegacion", "aria-label": "Secciones" }, enlace("#/", "Catálogo"), enlace("#/precios", "Precios")),
+      h(
+        "nav",
+        { clase: "navegacion", "aria-label": "Secciones" },
+        enlace("#/pedidos", "Pedidos"),
+        enlace("#/clientes", "Clientes"),
+        enlace("#/", "Catálogo"),
+        enlace("#/precios", "Precios"),
+      ),
       h(
         "div",
         { clase: "usuario" },
@@ -111,21 +120,59 @@ function enrutar(forzar = false) {
 
   document.querySelectorAll<HTMLElement>(".navegacion a").forEach((a) => {
     const r = a.dataset.ruta!;
-    a.classList.toggle("activo", r === "#/" ? !ruta.startsWith("#/precios") : ruta.startsWith(r));
+    const seccion = /^#\/(pedidos|clientes|precios)/.exec(ruta)?.[0] ?? "#/";
+    a.classList.toggle("activo", r === seccion);
   });
 
+  // secciones de ventas: se recargan al entrar para ver siempre lo último
+  const ventas = /^#\/(pedidos|clientes)/.test(ruta);
+  if (ventas) {
+    vaciar(contenido, cargando());
+    recargarVentas()
+      .then(() => {
+        if (rutaActual === ruta) pintarRuta(ruta);
+      })
+      .catch((e) => {
+        avisar(mensajeDe(e), "error");
+        if (esDeSesion(e)) sesionVencida();
+      });
+    return;
+  }
+  pintarRuta(ruta);
+}
+
+function pintarRuta(ruta: string) {
   let vista: HTMLElement;
+  let titulo = "Catálogo";
   const perfume = ruta.match(/^#\/perfume\/(nuevo|\d+)$/);
+  const pedido = ruta.match(/^#\/pedidos\/(\d+)$/);
+  const nuevoPedido = ruta.match(/^#\/pedidos\/nuevo(?:\?cliente=(\d+))?$/);
+  const cliente = ruta.match(/^#\/clientes\/(nuevo|\d+)$/);
   if (perfume) {
     vista = vistaFormulario(perfume[1]!, navegar, sesionVencida);
-    document.title = "Perfume · Panel Coco & Cuero";
+    titulo = "Perfume";
   } else if (ruta === "#/precios") {
     vista = vistaPrecios(sesionVencida);
-    document.title = "Precios · Panel Coco & Cuero";
+    titulo = "Precios";
+  } else if (nuevoPedido) {
+    vista = vistaNuevoPedido(nuevoPedido[1] ? Number(nuevoPedido[1]) : null, navegar, sesionVencida);
+    titulo = "Nuevo pedido";
+  } else if (pedido) {
+    vista = vistaPedido(Number(pedido[1]), navegar, sesionVencida);
+    titulo = `Pedido #${pedido[1]}`;
+  } else if (ruta.startsWith("#/pedidos")) {
+    vista = vistaPedidos(sesionVencida);
+    titulo = "Pedidos";
+  } else if (cliente) {
+    vista = vistaCliente(cliente[1]!, navegar, sesionVencida);
+    titulo = "Cliente";
+  } else if (ruta.startsWith("#/clientes")) {
+    vista = vistaClientes();
+    titulo = "Clientes";
   } else {
     vista = vistaCatalogo(sesionVencida);
-    document.title = "Catálogo · Panel Coco & Cuero";
   }
+  document.title = `${titulo} · Panel Coco & Cuero`;
   vaciar(contenido, vista);
   window.scrollTo({ top: 0 });
 }

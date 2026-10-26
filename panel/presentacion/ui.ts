@@ -6,7 +6,7 @@
 
 import { h, type Props } from "../../compartido/dom";
 
-export { h, vaciar } from "../../compartido/dom";
+export { avisar, campo, conBotonOcupado, h, marcarErrores, vaciar } from "../../compartido/dom";
 
 // ------------------------------------------------------------ formato
 const pesos = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 });
@@ -16,24 +16,6 @@ export const fmtPesos = (n: number | null) => (n === null ? "—" : pesos.format
 export const fmtPorcentaje = (n: number | null) => (n === null ? "—" : porcentaje.format(n));
 
 export { urlDeFoto } from "../../compartido/texto";
-
-// ------------------------------------------------------------ avisos
-let contenedorAvisos: HTMLElement | null = null;
-
-export function avisar(mensaje: string, tipo: "exito" | "error" | "info" = "info"): void {
-  if (!contenedorAvisos) {
-    contenedorAvisos = h("div", { clase: "avisos", role: "status", "aria-live": "polite" });
-    document.body.append(contenedorAvisos);
-  }
-  const aviso = h("div", { clase: `aviso aviso-${tipo}` }, mensaje);
-  contenedorAvisos.append(aviso);
-  const quitar = () => {
-    aviso.classList.add("saliendo");
-    setTimeout(() => aviso.remove(), 250);
-  };
-  aviso.addEventListener("click", quitar);
-  setTimeout(quitar, tipo === "error" ? 7000 : 3500);
-}
 
 // ------------------------------------------------------------ diálogo
 /**
@@ -73,19 +55,6 @@ export function confirmar(opciones: {
 }
 
 // ------------------------------------------------------------ controles
-export function campo(etiqueta: string, control: HTMLElement, opciones: { nombre?: string; ayuda?: string } = {}) {
-  const id = control.id || `c-${Math.random().toString(36).slice(2, 8)}`;
-  control.id = id;
-  return h(
-    "div",
-    { clase: "campo", dataset: opciones.nombre ? { campo: opciones.nombre } : undefined },
-    h("label", { for: id }, etiqueta),
-    control,
-    opciones.ayuda ? h("p", { clase: "campo-ayuda" }, opciones.ayuda) : null,
-    h("p", { clase: "campo-error", role: "alert" }),
-  );
-}
-
 export function selector(
   opciones: { valor: string; texto: string }[],
   valor: string,
@@ -101,36 +70,18 @@ export function selector(
   return s;
 }
 
-/** Pone los mensajes de error junto a cada campo (data-campo="…"). */
-export function marcarErrores(raiz: HTMLElement, problemas: { campo: string; mensaje: string }[]): void {
-  raiz.querySelectorAll<HTMLElement>("[data-campo]").forEach((c) => {
-    c.classList.remove("con-error");
-    const p = c.querySelector(".campo-error");
-    if (p) p.textContent = "";
-  });
-  for (const pr of problemas) {
-    const c = raiz.querySelector<HTMLElement>(`[data-campo="${CSS.escape(pr.campo)}"]`);
-    if (!c) continue;
-    c.classList.add("con-error");
-    const p = c.querySelector(".campo-error");
-    if (p && !p.textContent) p.textContent = pr.mensaje;
-  }
-  raiz.querySelector<HTMLElement>(".con-error input, .con-error select")?.focus();
-}
-
 export function cargando(texto = "Cargando…"): HTMLElement {
   return h("div", { clase: "cargando" }, h("span", { clase: "giro", "aria-hidden": "true" }), texto);
 }
 
-/** Desactiva un botón mientras corre una promesa. */
-export async function conBotonOcupado<T>(boton: HTMLButtonElement, texto: string, tarea: () => Promise<T>): Promise<T> {
-  const original = boton.textContent;
-  boton.disabled = true;
-  boton.textContent = texto;
-  try {
-    return await tarea();
-  } finally {
-    boton.disabled = false;
-    boton.textContent = original;
-  }
+const SVG_NS = "http://www.w3.org/2000/svg";
+/** Ícono de WhatsApp (constante, no viene de datos). */
+export function iconoWhatsApp(): SVGSVGElement {
+  const el = document.createElementNS(SVG_NS, "svg");
+  el.setAttribute("viewBox", "0 0 24 24");
+  el.setAttribute("aria-hidden", "true");
+  const p = document.createElementNS(SVG_NS, "path");
+  p.setAttribute("d", "M12 2a10 10 0 0 0-8.7 15l-1.2 4.4 4.5-1.2A10 10 0 1 0 12 2zm5.1 13.8c-.2.6-1.2 1.2-1.7 1.2-.4 0-1 .1-3.2-.8-2.7-1.1-4.4-3.8-4.5-4-.1-.2-1.1-1.4-1.1-2.7s.7-1.9.9-2.1c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.4 0 .5l-.3.5-.3.3c-.1.1-.3.3-.1.6.1.3.6 1.1 1.4 1.8 1 .9 1.8 1.1 2.1 1.3.2.1.4.1.6-.1l.8-.9c.2-.2.3-.2.6-.1l1.9.9c.2.1.4.2.5.3.1.2.1.7-.2 1.3z");
+  el.append(p);
+  return el;
 }

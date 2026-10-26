@@ -45,6 +45,7 @@ export interface Perfume {
   publicado: boolean;
   presentaciones: Presentacion[];
   notas: number[];
+  descripcion: string | null;
   actualizadoEn: string;
 }
 
@@ -60,6 +61,7 @@ export interface PerfumeEditable {
   publicado: boolean;
   presentaciones: PresentacionEditable[];
   notas: number[];
+  descripcion: string | null;
 }
 
 export interface PresentacionEditable {
@@ -99,6 +101,82 @@ export interface PerfumePublico {
   genero: string;
   categoria: ClaveCategoria;
   imagenUrl: string | null;
-  presentaciones: { ml: number; precio: number }[];
+  descripcion: string | null;
+  /** id null solo en respaldos viejos, que no lo traían */
+  presentaciones: { id: number | null; ml: number; precio: number }[];
   notas: NotaPublica[];
+}
+
+// ------------------------------------------------------------------
+// Ventas (panel): clientes y pedidos
+// ------------------------------------------------------------------
+
+export type EstadoPedido = "consultado" | "apartado" | "comprado" | "entregado" | "cancelado";
+
+export interface ClienteAdmin {
+  id: number;
+  numeroCliente: number;
+  nombre: string;
+  telefono: string | null;
+  direccion: string | null;
+  ciudad: string | null;
+  canal: string | null;
+  correo: string | null;
+  rol: Rol;
+  conCuenta: boolean;
+  creadoEn: string;
+  pedidos: number;
+  pedidosActivos: number;
+  totalEntregado: number;
+}
+
+export interface ClienteEditable {
+  id?: number;
+  nombre: string;
+  telefono: string;
+  direccion: string;
+  ciudad: string;
+  canalId: number | null;
+}
+
+export interface PedidoAdmin {
+  id: number;
+  estado: EstadoPedido;
+  precioPactado: number;
+  anticipo: number;
+  saldo: number;
+  ciudadEntrega: string | null;
+  notas: string | null;
+  notaInterna: string | null;
+  creadoEn: string;
+  actualizadoEn: string;
+  clienteId: number;
+  numeroCliente: number | null;
+  clienteNombre: string | null;
+  clienteTelefono: string | null;
+  presentacionId: number;
+  ml: number | null;
+  perfumeId: number | null;
+  perfume: string | null;
+  marca: string | null;
+  imagenUrl: string | null;
+  historial: { estado: EstadoPedido; fecha: string }[];
+}
+
+export interface NuevoPedido {
+  clienteId: number | null;
+  presentacionId: number | null;
+  precioPactado: number;
+  anticipo: number;
+  ciudadEntrega: string;
+  notas: string;
+  notaInterna: string;
+}
+
+export interface CambiosDePedido {
+  estado?: EstadoPedido;
+  anticipo?: number;
+  precioPactado?: number;
+  ciudadEntrega?: string | null;
+  notas?: string | null;
 }

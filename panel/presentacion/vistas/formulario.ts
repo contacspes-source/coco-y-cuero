@@ -3,6 +3,7 @@ import { TIPOS_PERFUME, type PerfumeEditable, type PresentacionEditable } from "
 import { aEditable, claveDeCategoria, hayCambios, perfumeNuevo } from "../../negocio/catalogo";
 import { ErrorDeValidacion, esDeSesion, mensajeDe } from "../../negocio/errores";
 import { ganancia, precioSugerido } from "../../negocio/precios";
+import { LARGO_DESCRIPCION } from "../../negocio/validacion";
 import { estado, recargar, servicios } from "../estado";
 import { ErrorDeFoto, prepararFoto } from "../foto";
 import { avisar, campo, conBotonOcupado, fmtPesos, h, marcarErrores, selector, urlDeFoto, vaciar } from "../ui";
@@ -52,6 +53,17 @@ export function vistaFormulario(
     autocomplete: "off",
     al: { input: () => { actual.nombre = nombre.value; tocar(); } },
   });
+  const descripcion = h(
+    "textarea",
+    {
+      rows: 4,
+      maxlength: LARGO_DESCRIPCION,
+      placeholder: "Cómo huele, para qué ocasión, a qué se parece… Si lo dejas vacío, el sitio arma una frase con sus notas.",
+      al: { input: () => { actual.descripcion = descripcion.value; contadorDesc.textContent = `${descripcion.value.length}/${LARGO_DESCRIPCION}`; tocar(); } },
+    },
+    actual.descripcion ?? "",
+  );
+  const contadorDesc = h("span", { clase: "contador-texto" }, `${(actual.descripcion ?? "").length}/${LARGO_DESCRIPCION}`);
   const tipo = selector(
     TIPOS_PERFUME.map((t) => ({ valor: t, texto: t })),
     actual.tipo,
@@ -313,6 +325,7 @@ export function vistaFormulario(
             campo("Categoría", categoria, { nombre: "categoria" }),
             campo("Tipo", tipo, { nombre: "tipo" }),
           ),
+          h("div", { clase: "campo-largo" }, campo("Descripción para el sitio", descripcion, { nombre: "descripcion" }), contadorDesc),
           listaMarcas,
         ),
         h(

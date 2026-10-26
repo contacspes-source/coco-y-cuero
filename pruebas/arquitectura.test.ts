@@ -43,7 +43,7 @@ function capaDe(desde: string, especificador: string): string {
 const reglas = (m: string): Record<string, string[]> => ({
   [`${m}/presentacion`]: [`${m}/presentacion`, `${m}/negocio`, "compartido", "externo"],
   [`${m}/negocio`]: [`${m}/negocio`, `${m}/datos`, "compartido"],
-  [`${m}/datos`]: [`${m}/datos`, "compartido", ...(m === "panel" ? ["supabase"] : [])],
+  [`${m}/datos`]: [`${m}/datos`, "compartido", "supabase"],
 });
 
 const PERMITIDO: Record<string, string[]> = {
@@ -69,11 +69,11 @@ describe("regla de capas", () => {
     });
   }
 
-  test("solo datos/supabase.ts importa la librería de Supabase", () => {
+  test("solo los dos datos/supabase.ts importan la librería de Supabase", () => {
     const quienes = [...archivosTs(join(RAIZ, "panel")), ...archivosTs(join(RAIZ, "sitio")), ...archivosTs(join(RAIZ, "compartido"))]
       .filter((a) => importsDe(a).some((i) => i.startsWith("@supabase/")))
       .map((a) => relative(RAIZ, a).split(sep).join("/"));
-    expect(quienes).toEqual(["panel/datos/supabase.ts"]);
+    expect(quienes.sort()).toEqual(["panel/datos/supabase.ts", "sitio/datos/supabase.ts"]);
   });
 
   test("ningún archivo del repositorio contiene una llave secreta", () => {

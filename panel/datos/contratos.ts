@@ -3,7 +3,19 @@
  * depende de estas interfaces, no de Supabase; por eso en las pruebas
  * se le puede pasar un repositorio falso en memoria.
  */
-import type { CambioDePrecio, Catalogos, Perfume, PerfumeEditable, Rol, Usuario } from "../../compartido/tipos";
+import type {
+  CambioDePrecio,
+  CambiosDePedido,
+  Catalogos,
+  ClienteAdmin,
+  ClienteEditable,
+  NuevoPedido,
+  PedidoAdmin,
+  Perfume,
+  PerfumeEditable,
+  Rol,
+  Usuario,
+} from "../../compartido/tipos";
 
 export interface RepositorioCatalogo {
   cargarCatalogos(): Promise<Catalogos>;
@@ -30,4 +42,14 @@ export interface RepositorioSesion {
   enviarCorreoDeRecuperacion(correo: string, volverA: string): Promise<void>;
   cambiarContrasena(nueva: string): Promise<void>;
   alCambiar(escucha: (evento: EventoDeSesion) => void): void;
+}
+
+export interface RepositorioVentas {
+  listarClientes(): Promise<ClienteAdmin[]>;
+  guardarCliente(c: ClienteEditable): Promise<number>;
+  canales(): Promise<{ id: number; nombre: string }[]>;
+  listarPedidos(): Promise<PedidoAdmin[]>;
+  crearPedido(p: NuevoPedido): Promise<number>;
+  actualizarPedido(id: number, cambios: CambiosDePedido): Promise<void>;
+  guardarNotaInterna(pedidoId: number, nota: string | null): Promise<void>;
 }

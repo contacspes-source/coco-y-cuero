@@ -11,6 +11,7 @@ const valido = (): PerfumeEditable => ({
   imagenUrl: null,
   publicado: true,
   notas: [],
+  descripcion: null,
   presentaciones: [{ ml: 100, precioVenta: 1000, costo: 500 }],
 });
 

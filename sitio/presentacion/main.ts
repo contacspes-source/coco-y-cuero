@@ -20,12 +20,17 @@ import {
   mensajeWhatsApp,
   precioDesde,
   textoNotas,
+  conPerfume,
+  leerPerfumeAbierto,
   type Filtros,
   type Orden,
 } from "../negocio/catalogo";
-import { cargarCatalogo } from "../negocio/servicio";
+import { cargarCatalogo, conviene } from "../negocio/servicio";
 import { CONFIG, linkWhatsApp } from "./config";
 import { iconoFamilia, iconoWhatsApp } from "./iconos";
+import { abrirApartar, iniciarCuenta } from "./cuenta";
+import { vistaDetalle } from "./detalle";
+import { abrirHoja, cerrarHoja, hojaAbierta } from "./hoja";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -46,6 +51,44 @@ let filtros: Filtros = leerFiltros(location.search);
 
 const pesos = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 });
 const nombreGenero = (clave: string) => GENEROS.find((g) => g.clave === clave)?.nombre ?? "";
+
+// ------------------------------------------------------------ detalle
+const enlaceDe = (p: PerfumePublico) => `${location.pathname}${conPerfume(location.search, p.id)}`;
+const enlaceCompleto = (p: PerfumePublico) => `${location.origin}/?perfume=${p.id}`;
+
+function abrirDetalle(p: PerfumePublico, empujar = true) {
+  if (empujar && leerPerfumeAbierto(location.search) !== p.id) {
+    history.pushState({ perfume: p.id }, "", enlaceDe(p));
+  }
+  const hoja = abrirHoja({
+    etiqueta: `${p.marca} ${p.nombre}`,
+    clase: "hoja-detalle",
+    alCerrar: () => {
+      if (leerPerfumeAbierto(location.search) !== null) {
+        history.replaceState(null, "", `${location.pathname}${conPerfume(location.search, null)}`);
+      }
+      document.title = TITULO;
+    },
+  });
+  document.title = `${p.marca} ${p.nombre} · Coco & Cuero`;
+  hoja.pintar(
+    vistaDetalle(p, perfumes, {
+      apartar: (perfume, presentacion) => void abrirApartar(perfume, presentacion, () => abrirDetalle(perfume, false)),
+      abrirOtro: (otro) => abrirDetalle(otro),
+      enlace: enlaceCompleto,
+    }),
+  );
+}
+
+const TITULO = document.title;
+
+// atrás/adelante del navegador abre o cierra el detalle
+window.addEventListener("popstate", () => {
+  const id = leerPerfumeAbierto(location.search);
+  const p = id === null ? undefined : perfumes.find((x) => x.id === id);
+  if (p) abrirDetalle(p, false);
+  else if (hojaAbierta()) cerrarHoja();
+});
 
 // ------------------------------------------------------------ tarjeta
 function tarjeta(p: PerfumePublico): HTMLElement {
@@ -71,7 +114,19 @@ function tarjeta(p: PerfumePublico): HTMLElement {
       "div",
       { clase: "ficha-cuerpo" },
       h("p", { clase: "ficha-marca" }, p.marca),
-      h("h3", { clase: "ficha-nombre" }, p.nombre),
+      h(
+        "h3",
+        { clase: "ficha-nombre" },
+        h(
+          "a",
+          {
+            clase: "ficha-enlace",
+            href: enlaceDe(p),
+            al: { click: (e) => { e.preventDefault(); abrirDetalle(p); } },
+          },
+          p.nombre,
+        ),
+      ),
       h("p", { clase: "ficha-detalle" }, detalle),
       notas ? h("p", { clase: "familia" }, iconoFamilia(familia), h("span", null, notas)) : null,
       h(
@@ -226,6 +281,9 @@ cargarCatalogo()
   .then(({ perfumes: lista, origen }) => {
     perfumes = lista;
     pintar();
+    const abierto = leerPerfumeAbierto(location.search);
+    const p = abierto === null ? undefined : perfumes.find((x) => x.id === abierto);
+    if (p) abrirDetalle(p, false);
     if (origen === "respaldo") {
       rejilla.before(
         h("p", { clase: "aviso-respaldo" }, "Mostramos el catálogo guardado mientras se restablece la conexión. Confirma precio y existencia por WhatsApp."),
@@ -240,3 +298,6 @@ cargarCatalogo()
     vacio.hidden = false;
     vacioTexto.textContent = "No pudimos cargar el catálogo en este momento.";
   });
+
+// ------------------------------------------------------------ cuenta
+void iniciarCuenta($<HTMLButtonElement>("cuenta-boton"), conviene.cargarCuentaAlInicio(), () => {});

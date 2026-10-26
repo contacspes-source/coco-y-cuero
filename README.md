@@ -49,7 +49,7 @@ Requiere Node.js 22 o más nuevo.
 npm install          # una sola vez
 npm run dev          # sitio en http://localhost:5174/
 npm run dev:panel    # panel en http://localhost:5173/panel/
-npm test             # 133 pruebas
+npm test             # 180 pruebas
 npm run build        # revisa tipos, compila y arma dist/
 ```
 
@@ -60,8 +60,8 @@ npm run build        # revisa tipos, compila y arma dist/
 ## Calidad
 
 - **TypeScript estricto**: errores de tipos frenan la compilación.
-- **133 pruebas automáticas**: motor de precios, validación, filtros del panel y del sitio, ajuste masivo, catálogo con la base caída, casos de uso con repositorios falsos y regla de capas.
-- **37 pruebas de seguridad en la base** (`supabase/pruebas/seguridad.sql`).
+- **180 pruebas automáticas**: motor de precios, validación, filtros, ajuste masivo, catálogo con la base caída, estados de pedido, registro de clientes, detalle del perfume, casos de uso con repositorios falsos y regla de capas.
+- **49 pruebas de seguridad en la base** (`supabase/pruebas/seguridad.sql`).
 - **GitHub Actions** corre todo en cada push; si algo falla, el commit sale en rojo.
 
 ## Agregar o cambiar perfumes
@@ -80,3 +80,26 @@ Los filtros viven en la dirección, así que un anuncio puede llevar directo a u
 | Diseñador, del más barato al más caro | `cocoycuero.com/?categoria=disenador&orden=precio-menor#catalogo` |
 
 Valores: `genero` = caballero, dama, unisex · `categoria` = arabes, nicho, disenador · `aroma` = cuero, dulce, floral, amaderado, fresco · `orden` = precio-menor, precio-mayor, nombre · `q` = búsqueda libre. Se pueden agregar parámetros `utm_` sin problema.
+
+## Ventas: cómo fluye un pedido
+
+```
+Cliente aparta en la página ─┐
+                             ├─► Solicitado ─► Apartado ─► Comprado ─► Entregado
+Tú lo registras en el panel ─┘        (anticipo)   (ya lo tienes)  (saldo cobrado)
+                                  └──────────── Cancelado ─────────┘
+```
+
+- **Panel → Pedidos**: lo pendiente arriba (por confirmar, por comprar, por entregar, por cobrar). Cada pedido trae un mensaje de WhatsApp ya redactado según su estado.
+- **Panel → Clientes**: número de cliente, cómo te conocieron (útil para saber qué anuncio funciona), pedidos y total comprado.
+- **Mi cuenta (sitio)**: el cliente ve su número, sus pedidos con fechas y puede cancelar una solicitud mientras no la hayas apartado.
+
+## Textos que puedes cambiar sin tocar la lógica
+
+| Qué | Dónde |
+| --- | --- |
+| Pasos de compra, formas de pago, entregas, garantía, ciudades | `sitio/negocio/tienda.ts` |
+| Porcentaje de anticipo sugerido (hoy 50 %) | `PORCENTAJE_ANTICIPO` en `panel/negocio/ventas.ts` |
+| Mensajes de WhatsApp por estado del pedido | `mensajeParaCliente` en `panel/negocio/ventas.ts` |
+| Teléfono, Instagram y Facebook | `sitio/presentacion/config.ts` |
+| Descripción de cada perfume | Panel → Catálogo → Editar |

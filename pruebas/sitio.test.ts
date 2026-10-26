@@ -27,18 +27,19 @@ function p(parcial: Partial<PerfumePublico> & { id: number }): PerfumePublico {
     genero: "caballero",
     categoria: "arabes",
     imagenUrl: null,
-    presentaciones: [{ ml: 100, precio: 1000 }],
+    descripcion: null,
+    presentaciones: [{ id: null, ml: 100, precio: 1000 }],
     notas: [],
     ...parcial,
   };
 }
 
 const lista: PerfumePublico[] = [
-  p({ id: 1, marca: "Lattafa", nombre: "Asad", genero: "caballero", categoria: "arabes", presentaciones: [{ ml: 100, precio: 870 }], notas: [nota("vainilla", "Dulce y gourmand"), nota("ámbar", "Ámbar y cuero"), nota("cacao", "Ámbar y cuero")] }),
-  p({ id: 2, marca: "Lattafa", nombre: "Yara", genero: "dama", categoria: "arabes", presentaciones: [{ ml: 100, precio: 1200 }], notas: [nota("floral", "Floral"), nota("dulce", "Dulce y gourmand")] }),
-  p({ id: 3, marca: "Carolina Herrera", nombre: "Good Girl", genero: "dama", categoria: "disenador", presentaciones: [{ ml: 80, precio: 2920 }] }),
-  p({ id: 4, marca: "Versace", nombre: "Eros", genero: "caballero", categoria: "disenador", presentaciones: [{ ml: 50, precio: 1500 }, { ml: 100, precio: 2000 }], notas: [nota("madera", "Amaderado")] }),
-  p({ id: 5, marca: "Rasasi", nombre: "Hawas Elixir", genero: "unisex", categoria: "arabes", presentaciones: [{ ml: 100, precio: 1790 }], notas: [nota("cítrico", "Fresco y cítrico")] }),
+  p({ id: 1, marca: "Lattafa", nombre: "Asad", genero: "caballero", categoria: "arabes", presentaciones: [{ id: null, ml: 100, precio: 870 }], notas: [nota("vainilla", "Dulce y gourmand"), nota("ámbar", "Ámbar y cuero"), nota("cacao", "Ámbar y cuero")] }),
+  p({ id: 2, marca: "Lattafa", nombre: "Yara", genero: "dama", categoria: "arabes", presentaciones: [{ id: null, ml: 100, precio: 1200 }], notas: [nota("floral", "Floral"), nota("dulce", "Dulce y gourmand")] }),
+  p({ id: 3, marca: "Carolina Herrera", nombre: "Good Girl", genero: "dama", categoria: "disenador", presentaciones: [{ id: null, ml: 80, precio: 2920 }] }),
+  p({ id: 4, marca: "Versace", nombre: "Eros", genero: "caballero", categoria: "disenador", presentaciones: [{ id: null, ml: 50, precio: 1500 }, { id: null, ml: 100, precio: 2000 }], notas: [nota("madera", "Amaderado")] }),
+  p({ id: 5, marca: "Rasasi", nombre: "Hawas Elixir", genero: "unisex", categoria: "arabes", presentaciones: [{ id: null, ml: 100, precio: 1790 }], notas: [nota("cítrico", "Fresco y cítrico")] }),
 ];
 
 const ids = (f: Partial<Filtros>) => filtrar(lista, { ...SIN_FILTROS, ...f }).map((x) => x.id);

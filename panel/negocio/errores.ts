@@ -1,20 +1,8 @@
 import { ErrorDeDatos } from "../datos/errores";
+import { ErrorDeValidacion } from "../../compartido/errores";
 
-export { ErrorDeDatos };
-
-export interface ProblemaDeCampo {
-  /** "marca", "nombre", "presentacion.0.precio"… */
-  campo: string;
-  mensaje: string;
-}
-
-/** El formulario tiene errores; se lanza ANTES de tocar la red. */
-export class ErrorDeValidacion extends Error {
-  constructor(public readonly problemas: ProblemaDeCampo[]) {
-    super(problemas.map((p) => p.mensaje).join(" "));
-    this.name = "ErrorDeValidacion";
-  }
-}
+export { ErrorDeDatos, ErrorDeValidacion };
+export type { ProblemaDeCampo } from "../../compartido/errores";
 
 /** La cuenta existe pero no es de administrador. */
 export class ErrorDeAcceso extends Error {

@@ -5,7 +5,7 @@
 -- Supabase y ejecútalo. Todo corre dentro de una transacción que
 -- termina en ROLLBACK, así que NO deja datos de prueba.
 --
--- Resultado esperado: las 37 filas con estado = 'OK'.
+-- Resultado esperado: las 49 filas con estado = 'OK'.
 -- Si alguna dice 'FALLA', no publiques el cambio que hiciste.
 --
 -- Córrelas cada vez que toques una política RLS, un GRANT o una
@@ -35,7 +35,7 @@ insert into _p select 7,'registro ignora rol=admin','cliente',rol from public.cl
 insert into _p select 8,'telefono normalizado','3312345678',telefono from public.cliente where auth_user_id='aaaaaaaa-0000-0000-0000-000000000001';
 
 do $$
-declare v bigint; r text; total bigint; datos jsonb; costo0 numeric;
+declare v bigint; r text; total bigint; datos jsonb; costo0 numeric; pres bigint; mio bigint; i int;
 begin
   select count(*) into total from public.perfume;
 
@@ -239,6 +239,83 @@ begin
   set local role anon;
   select count(*) into v from public.catalogo_publico;
   reset role; insert into _p values (39,'un perfume de baja sale de la vista', (total - 1)::text, v::text);
+
+  -- =============================================================
+  -- Incremento 4 · clientes y pedidos
+  -- =============================================================
+  select pr.id into pres from public.presentacion pr
+    join public.perfume pe on pe.id = pr.perfume_id where pe.publicado order by pr.id limit 1;
+
+  set local role anon;
+  begin perform public.solicitar_pedido(pres); r := 'PIDIO';
+  exception when insufficient_privilege then r := 'bloqueado'; end;
+  reset role; insert into _p values (40,'anon solicita un pedido','bloqueado',r);
+
+  -- Beto (cliente) aparta un perfume: el precio lo pone la base
+  perform set_config('request.jwt.claims','{"sub":"bbbbbbbb-0000-0000-0000-000000000002","role":"authenticated"}', true);
+  set local role authenticated;
+  mio := public.solicitar_pedido(pres, 'Zamora', 'Lo quiero para regalo');
+  select (precio_pactado = (select precio_venta from public.presentacion where id = pres)
+          and estado = 'consultado' and anticipo = 0)::text into r
+    from public.pedido_detalle where id = mio;
+  reset role; insert into _p values (41,'cliente solicita con precio real','true',r); set local role authenticated;
+
+  begin insert into public.pedido (cliente_id, presentacion_id, precio_pactado)
+        select id, pres, 1 from public.cliente where auth_user_id = auth.uid();
+        r := 'INSERTO DIRECTO';
+  exception when insufficient_privilege then r := 'bloqueado'; end;
+  reset role; insert into _p values (42,'cliente inserta pedido sin la funcion','bloqueado',r); set local role authenticated;
+
+  select count(*) into v from public.pedido_detalle;
+  reset role; insert into _p values (43,'cliente ve solo sus pedidos','2',v::text);
+
+  -- límite de solicitudes abiertas
+  begin
+    for i in 1..5 loop perform public.solicitar_pedido(pres); end loop;
+    r := 'SIN LIMITE';
+  exception when raise_exception then r := 'bloqueado'; end;
+  set local role authenticated;
+  reset role; insert into _p values (44,'maximo 5 solicitudes abiertas','bloqueado',r);
+
+  -- nota interna del admin
+  insert into public.pedido_nota_interna (pedido_id, nota) values (mio, 'Cliente frecuente, dar prioridad');
+  set local role authenticated;
+  select coalesce(nota_interna, 'oculta') into r from public.pedido_detalle where id = mio;
+  reset role; insert into _p values (45,'cliente no ve la nota interna','oculta',r); set local role authenticated;
+  select count(*) into v from public.pedido_nota_interna;
+  reset role; insert into _p values (46,'cliente lee tabla de notas internas','0',v::text);
+
+  -- Ana no puede cancelar el pedido de Beto
+  perform set_config('request.jwt.claims','{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}', true);
+  set local role authenticated;
+  begin perform public.cancelar_mi_pedido(mio); r := 'CANCELO AJENO';
+  exception when raise_exception then r := 'bloqueado'; end;
+  reset role; insert into _p values (47,'cancelar pedido ajeno','bloqueado',r); set local role authenticated;
+  begin perform public.clientes_admin(); r := 'VIO CLIENTES';
+  exception when insufficient_privilege then r := 'bloqueado'; end;
+  reset role; insert into _p values (48,'cliente pide lista de clientes','bloqueado',r);
+
+  -- Beto cancela su propia solicitud; queda en el historial
+  perform set_config('request.jwt.claims','{"sub":"bbbbbbbb-0000-0000-0000-000000000002","role":"authenticated"}', true);
+  set local role authenticated;
+  perform public.cancelar_mi_pedido(mio);
+  select (estado || ':' || json_array_length(historial))::text into r from public.pedido_detalle where id = mio;
+  reset role; insert into _p values (49,'cancela lo suyo y queda historial','cancelado:2',r);
+
+  -- un pedido ya apartado ya no lo cancela el cliente
+  update public.pedido set estado = 'apartado'
+   where id = (select min(id) from public.pedido where estado = 'consultado'
+                and cliente_id = (select id from public.cliente where auth_user_id = 'bbbbbbbb-0000-0000-0000-000000000002'));
+  set local role authenticated;
+  begin perform public.cancelar_mi_pedido((select min(id) from public.pedido where estado = 'apartado')); r := 'CANCELO APARTADO';
+  exception when raise_exception then r := 'bloqueado'; end;
+  reset role; insert into _p values (50,'cliente cancela un apartado','bloqueado',r);
+
+  -- el admin ve la lista de clientes con correo
+  perform set_config('request.jwt.claims','{"sub":"cccccccc-0000-0000-0000-000000000003","role":"authenticated"}', true);
+  set local role authenticated;
+  select correo into r from public.clientes_admin() where nombre = 'Beto Prueba';
+  reset role; insert into _p values (51,'admin ve clientes con correo','beto@prueba.mx',r);
 end $$;
 
 select n, prueba, esperado, obtenido,

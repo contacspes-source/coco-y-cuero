@@ -11,6 +11,7 @@ import { RepositorioSesionSupabase } from "../datos/repositorio-sesion";
 import { cambiosDe, slug, type RenglonDeAjuste } from "./catalogo";
 import { ErrorDeAcceso, ErrorDeValidacion } from "./errores";
 import { normalizar, validarPerfume } from "./validacion";
+import { crearServicioVentas } from "./ventas";
 
 export class ServicioCatalogo {
   constructor(
@@ -113,6 +114,7 @@ export function crearServicios() {
   return {
     catalogo: new ServicioCatalogo(new RepositorioCatalogoSupabase(), new RepositorioFotosSupabase()),
     sesion: new ServicioSesion(new RepositorioSesionSupabase()),
+    ventas: crearServicioVentas(),
   };
 }
 

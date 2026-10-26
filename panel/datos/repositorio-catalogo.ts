@@ -17,6 +17,7 @@ interface FilaPerfume {
   genero_id: number;
   categoria_id: number;
   imagen_url: string | null;
+  descripcion: string | null;
   publicado: boolean;
   actualizado_en: string;
   marca: { nombre: string } | null;
@@ -68,7 +69,7 @@ export class RepositorioCatalogoSupabase implements RepositorioCatalogo {
         db
           .from("perfume")
           .select(
-            "id, nombre, tipo, genero_id, categoria_id, imagen_url, publicado, actualizado_en," +
+            "id, nombre, tipo, genero_id, categoria_id, imagen_url, descripcion, publicado, actualizado_en," +
               " marca(nombre), presentacion(id, ml, precio_venta), perfume_nota(nota_id)",
           )
           .order("id"),
@@ -88,6 +89,7 @@ export class RepositorioCatalogoSupabase implements RepositorioCatalogo {
         generoId: p.genero_id,
         categoriaId: p.categoria_id,
         imagenUrl: p.imagen_url,
+        descripcion: p.descripcion,
         publicado: p.publicado,
         actualizadoEn: p.actualizado_en,
         notas: p.perfume_nota.map((n) => n.nota_id),
@@ -116,6 +118,7 @@ export class RepositorioCatalogoSupabase implements RepositorioCatalogo {
           genero_id: d.generoId,
           categoria_id: d.categoriaId,
           imagen_url: d.imagenUrl,
+          descripcion: d.descripcion,
           publicado: d.publicado,
           presentaciones: d.presentaciones.map((p) => ({
             id: p.id ?? null,

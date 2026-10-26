@@ -202,6 +202,7 @@ export function aEditable(p: Perfume): PerfumeEditable {
     categoriaId: p.categoriaId,
     imagenUrl: p.imagenUrl,
     publicado: p.publicado,
+    descripcion: p.descripcion,
     notas: [...p.notas],
     presentaciones: p.presentaciones.map((pr) => ({ ...pr })),
   };
@@ -216,6 +217,7 @@ export function perfumeNuevo(catalogos: Catalogos): PerfumeEditable {
     categoriaId: catalogos.categorias[0]?.id ?? 0,
     imagenUrl: null,
     publicado: true,
+    descripcion: null,
     notas: [],
     presentaciones: [{ ml: 100, precioVenta: 0, costo: null }],
   };
