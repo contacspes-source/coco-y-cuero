@@ -1,0 +1,23 @@
+{
+  "name": "coco-y-cuero",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "description": "Sitio y panel administrativo de Coco & Cuero",
+  "scripts": {
+    "dev": "vite --config panel/vite.config.ts",
+    "build": "npm run verificar && vite build --config panel/vite.config.ts && node scripts/copiar-sitio.mjs",
+    "verificar": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "test:vigilar": "vitest"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.50.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.30",
+    "typescript": "5.8.3",
+    "vite": "6.3.5",
+    "vitest": "3.2.4"
+  }
+}

@@ -1,0 +1,26 @@
+# Integración continua: en cada push y pull request revisa tipos,
+# corre las pruebas y compila. Si algo falla, GitHub lo marca en rojo
+# antes de que llegue a producción.
+name: Calidad
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Tipos (TypeScript estricto)
+        run: npm run verificar
+      - name: Pruebas
+        run: npm test
+      - name: Compilación
+        run: npx vite build --config panel/vite.config.ts && node scripts/copiar-sitio.mjs

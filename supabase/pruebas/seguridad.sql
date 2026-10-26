@@ -5,7 +5,7 @@
 -- Supabase y ejecútalo. Todo corre dentro de una transacción que
 -- termina en ROLLBACK, así que NO deja datos de prueba.
 --
--- Resultado esperado: todas las filas con estado = 'OK'.
+-- Resultado esperado: las 34 filas con estado = 'OK'.
 -- Si alguna dice 'FALLA', no publiques el cambio que hiciste.
 --
 -- Córrelas cada vez que toques una política RLS, un GRANT o una
@@ -35,7 +35,7 @@ insert into _p select 7,'registro ignora rol=admin','cliente',rol from public.cl
 insert into _p select 8,'telefono normalizado','3312345678',telefono from public.cliente where auth_user_id='aaaaaaaa-0000-0000-0000-000000000001';
 
 do $$
-declare v bigint; r text; total bigint;
+declare v bigint; r text; total bigint; datos jsonb; costo0 numeric;
 begin
   select count(*) into total from public.perfume;
 
@@ -94,10 +94,13 @@ begin
   begin update public.pedido set estado='entregado'; r := 'PASO DIRECTO';
   exception when raise_exception then r := 'bloqueado'; end;
   reset role; insert into _p values (21,'Pedido consultado a entregado','bloqueado',r); set local role authenticated;
+  -- la regla se revisa al confirmar; aquí se fuerza a revisarla ya
   begin update public.presentacion set precio_venta = 1
         where id = (select presentacion_id from public.margen_actual order by costo desc limit 1);
+        set constraints all immediate;
+        set constraints all deferred;
         r := 'VENDIO CON PERDIDA';
-  exception when raise_exception then r := 'bloqueado'; end;
+  exception when raise_exception then r := 'bloqueado'; set constraints all deferred; end;
   reset role; insert into _p values (22,'Precio bajo el costo','bloqueado',r); set local role authenticated;
   update public.perfume set publicado = false
    where id = (select id from public.perfume order by id limit 1);
@@ -110,6 +113,116 @@ begin
   set local role anon;
   select count(*) into v from public.perfume;
   reset role; insert into _p values (25,'anon ya no ve el dado de baja', (total - 1)::text, v::text);
+
+  -- =============================================================
+  -- Incremento 2 · funciones del panel y fotos
+  -- =============================================================
+
+  -- Un perfume de muestra (el primero) armado como lo manda el panel
+  select jsonb_build_object(
+           'id', pe.id, 'marca', m.nombre, 'genero_id', pe.genero_id,
+           'categoria_id', pe.categoria_id, 'nombre', pe.nombre, 'tipo', pe.tipo,
+           'imagen_url', pe.imagen_url, 'publicado', true,
+           'presentaciones', jsonb_build_array(jsonb_build_object(
+              'id', pr.id, 'ml', pr.ml, 'precio_venta', pr.precio_venta,
+              'costo', privado.costo_vigente(pr.id))),
+           'notas', '[]'::jsonb),
+         privado.costo_vigente(pr.id)
+    into datos, costo0
+  from public.perfume pe
+  join public.marca m on m.id = pe.marca_id
+  join public.presentacion pr on pr.perfume_id = pe.id
+  order by pe.id limit 1;
+
+  -- ===== VISITANTE Y CLIENTE NO PUEDEN USARLAS =====
+  set local role anon;
+  begin perform public.guardar_perfume(datos); r := 'GUARDO';
+  exception when insufficient_privilege then r := 'bloqueado'; end;
+  reset role; insert into _p values (26,'anon guarda un perfume','bloqueado',r);
+
+  perform set_config('request.jwt.claims','{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}', true);
+  set local role authenticated;
+  begin perform public.guardar_perfume(datos); r := 'GUARDO';
+  exception when insufficient_privilege then r := 'bloqueado'; end;
+  reset role; insert into _p values (27,'Ana guarda un perfume','bloqueado',r); set local role authenticated;
+  begin perform public.actualizar_precios('[{"presentacion_id":1,"precio_venta":5}]'); r := 'CAMBIO';
+  exception when insufficient_privilege then r := 'bloqueado'; end;
+  reset role; insert into _p values (28,'Ana cambia precios masivo','bloqueado',r); set local role authenticated;
+  begin insert into storage.objects (bucket_id, name) values ('perfumes', 'pirata.jpg'); r := 'SUBIO';
+  exception when insufficient_privilege then r := 'bloqueado'; end;
+  reset role; insert into _p values (29,'Ana sube una foto','bloqueado',r);
+
+  -- ===== ADMINISTRADOR =====
+  perform set_config('request.jwt.claims','{"sub":"cccccccc-0000-0000-0000-000000000003","role":"authenticated"}', true);
+  set local role authenticated;
+
+  -- alta con marca nueva: crea la marca, el perfume, su precio y su costo
+  begin
+    v := public.guardar_perfume(jsonb_build_object(
+      'marca','Marca de Prueba','genero_id',3,'categoria_id',2,
+      'nombre','Perfume de Prueba','tipo','EDP',
+      'presentaciones', jsonb_build_array(jsonb_build_object('ml',100,'precio_venta',2000,'costo',1000)),
+      'notas', jsonb_build_array((select min(id) from public.nota))));
+    select count(*)::text into r from public.margen_actual
+     where perfume_id = v and costo = 1000 and precio_venta = 2000;
+  exception when others then r := 'ERROR: ' || sqlerrm; end;
+  reset role; insert into _p values (30,'Admin da de alta con costo','1',r); set local role authenticated;
+
+  -- bajar costo y precio A LA VEZ: el precio nuevo queda debajo del
+  -- costo viejo pero arriba del nuevo. Antes de la 008 era imposible.
+  begin
+    perform public.guardar_perfume(jsonb_set(jsonb_set(datos,
+      '{presentaciones,0,costo}',        to_jsonb(round(costo0 * 0.5))),
+      '{presentaciones,0,precio_venta}', to_jsonb(round(costo0 * 0.8))));
+    r := 'guardado';
+  exception when others then r := 'ERROR: ' || sqlerrm; end;
+  reset role; insert into _p values (31,'Bajar costo y precio juntos','guardado',r); set local role authenticated;
+
+  -- el costo vigente ya es el nuevo
+  select (privado.costo_vigente((datos #>> '{presentaciones,0,id}')::bigint) = round(costo0 * 0.5))::text
+    into r;
+  reset role; insert into _p values (32,'Costo vigente actualizado','true',r); set local role authenticated;
+
+  -- subir el costo por encima del precio: rechazado
+  begin
+    perform public.guardar_perfume(jsonb_set(datos,
+      '{presentaciones,0,costo}', to_jsonb((datos #>> '{presentaciones,0,precio_venta}')::numeric + 1)));
+    r := 'COSTO MAYOR QUE PRECIO';
+  exception when raise_exception then r := 'bloqueado'; end;
+  reset role; insert into _p values (33,'Costo por encima del precio','bloqueado',r); set local role authenticated;
+
+  -- lo mismo, directo a la tabla sin pasar por la función
+  begin
+    insert into public.costo_proveedor (presentacion_id, proveedor_id, costo, vigente_desde)
+    values ((datos #>> '{presentaciones,0,id}')::bigint, (select min(id) from public.proveedor),
+            999999, current_date + 1);
+    set constraints all immediate;
+    set constraints all deferred;
+    r := 'COSTO MAYOR QUE PRECIO';
+  exception when raise_exception then r := 'bloqueado'; set constraints all deferred; end;
+  reset role; insert into _p values (34,'Costo alto directo a la tabla','bloqueado',r); set local role authenticated;
+
+  -- ajuste masivo de precios
+  begin
+    v := public.actualizar_precios((
+      select jsonb_agg(jsonb_build_object('presentacion_id', presentacion_id,
+                                          'precio_venta', precio_venta + 10))
+      from (select presentacion_id, precio_venta from public.margen_actual
+            order by presentacion_id limit 5) x));
+    r := v::text;
+  exception when others then r := 'ERROR: ' || sqlerrm; end;
+  reset role; insert into _p values (35,'Admin sube 5 precios a la vez','5',r); set local role authenticated;
+
+  -- ajuste masivo que dejaría uno bajo costo: no se aplica NINGUNO
+  begin
+    perform public.actualizar_precios((
+      select jsonb_agg(jsonb_build_object('presentacion_id', presentacion_id, 'precio_venta',
+               case when rn = 1 then 1 else precio_venta + 50 end))
+      from (select presentacion_id, precio_venta, row_number() over (order by presentacion_id) rn
+            from public.margen_actual where costo is not null order by presentacion_id limit 3) x));
+    r := 'APLICO';
+  exception when raise_exception then r := 'bloqueado'; end;
+  reset role; insert into _p values (36,'Masivo con uno bajo costo','bloqueado',r);
 end $$;
 
 select n, prueba, esperado, obtenido,

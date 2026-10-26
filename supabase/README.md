@@ -1,6 +1,6 @@
 # Base de datos · Coco & Cuero
 
-Incremento 1 del panel administrativo. Esquema en PostgreSQL 17 sobre Supabase.
+Base del sitio y del panel administrativo. Esquema en PostgreSQL 17 sobre Supabase.
 
 | | |
 | --- | --- |
@@ -32,14 +32,19 @@ supabase/
 | 005_semilla | Catálogos base y los 53 perfumes del proveedor de Guadalajara |
 | 006_politicas_por_rol | Corrige un error encontrado en pruebas que habría tumbado el sitio público |
 | 007_ajustes_del_auditor | Funciones auxiliares fuera de la API, índice faltante, políticas consolidadas |
+| 008_panel_admin | Bucket de fotos, regla precio/costo al confirmar, funciones `guardar_perfume` y `actualizar_precios` |
+| 009_restaurar_modo_diferido | Corrige un error de la 008 encontrado en pruebas |
 
-La 003 y la 006 corrigen errores de las anteriores. Se dejan así a propósito: una migración ya aplicada no se edita, se corrige con otra nueva. Así el historial cuenta lo que realmente pasó.
+La 003, la 006 y la 009 corrigen errores de las anteriores. Se dejan así a propósito: una migración ya aplicada no se edita, se corrige con otra nueva. Así el historial cuenta lo que realmente pasó.
 
 ## Reglas de negocio que vigila la base
 
 La base las hace cumplir aunque el panel tenga un error:
 
-- **Ningún precio por debajo del costo vigente.** Intentarlo da error.
+- **Ningún precio por debajo del costo vigente.** Se revisa al confirmar la transacción, así que se puede bajar costo y precio en la misma operación, y subir el costo por encima del precio también se rechaza.
+- **Guardar un perfume es todo o nada.** `guardar_perfume` guarda datos, presentaciones, costos y notas en una sola transacción.
+- **Cambiar un costo no borra el anterior.** Queda en `costo_proveedor` como historial.
+- **Fotos:** cualquiera puede verlas por su URL; solo el administrador sube, reemplaza o borra.
 - **Un pedido solo avanza en orden:** consultado → apartado → comprado → entregado. Cualquiera puede pasar a cancelado. Entregado y cancelado ya no cambian.
 - **El anticipo no puede ser mayor que el precio pactado.**
 - **El número de cliente lo asigna una secuencia** que empieza en 1001. Nunca se repite.
@@ -60,9 +65,9 @@ Es a propósito que no se pueda hacer desde la aplicación: ni tú ni nadie pued
 
 Pega `pruebas/seguridad.sql` completo en el SQL Editor y ejecútalo. Corre dentro de una transacción que se revierte, así que no deja datos.
 
-**Resultado esperado: 23 de 23 en OK.** Si alguna dice FALLA, no publiques el cambio.
+**Resultado esperado: 34 de 34 en OK.** Si alguna dice FALLA, no publiques el cambio.
 
-## Números al cerrar el incremento 1
+## Números
 
 | | |
 | --- | --- |
@@ -70,5 +75,5 @@ Pega `pruebas/seguridad.sql` completo en el SQL Editor y ejecútalo. Corre dentr
 | Perfumes cargados | 53 |
 | Precios por debajo del costo | 0 |
 | Margen promedio sobre costo real | 47% |
-| Pruebas de seguridad | 23 de 23 |
+| Pruebas de seguridad | 34 de 34 |
 | Avisos de seguridad de Supabase | 0 |
