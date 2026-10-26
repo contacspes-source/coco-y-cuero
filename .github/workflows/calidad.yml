@@ -23,4 +23,4 @@ jobs:
       - name: Pruebas
         run: npm test
       - name: Compilación
-        run: npx vite build --config panel/vite.config.ts && node scripts/copiar-sitio.mjs
+        run: npm run compilar
