@@ -5,7 +5,7 @@
 -- Supabase y ejecútalo. Todo corre dentro de una transacción que
 -- termina en ROLLBACK, así que NO deja datos de prueba.
 --
--- Resultado esperado: las 34 filas con estado = 'OK'.
+-- Resultado esperado: las 37 filas con estado = 'OK'.
 -- Si alguna dice 'FALLA', no publiques el cambio que hiciste.
 --
 -- Córrelas cada vez que toques una política RLS, un GRANT o una
@@ -223,6 +223,22 @@ begin
     r := 'APLICO';
   exception when raise_exception then r := 'bloqueado'; end;
   reset role; insert into _p values (36,'Masivo con uno bajo costo','bloqueado',r);
+
+  -- =============================================================
+  -- Incremento 3 · vista pública del catálogo
+  -- =============================================================
+  select count(*) into total from public.perfume where publicado;
+  set local role anon;
+  select count(*) into v from public.catalogo_publico;
+  reset role; insert into _p values (37,'anon lee el catálogo público', total::text, v::text);
+  select string_agg(column_name, ',') into r from information_schema.columns
+   where table_schema = 'public' and table_name = 'catalogo_publico';
+  insert into _p values (38,'la vista pública no tiene costos','false',(r ilike '%costo%')::text);
+  update public.perfume set publicado = false
+   where id = (select min(id) from public.perfume where publicado);
+  set local role anon;
+  select count(*) into v from public.catalogo_publico;
+  reset role; insert into _p values (39,'un perfume de baja sale de la vista', (total - 1)::text, v::text);
 end $$;
 
 select n, prueba, esperado, obtenido,

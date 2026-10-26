@@ -4,7 +4,7 @@ import { defineConfig } from "vite";
 const raizRepo = fileURLToPath(new URL("..", import.meta.url));
 
 // El panel se compila a dist/panel y se sirve en cocoycuero.com/panel/.
-// El sitio público lo copia scripts/copiar-sitio.mjs a dist/ tal cual.
+// Se compila DESPUÉS del sitio, que vacía dist/ (ver package.json).
 export default defineConfig({
   root: fileURLToPath(new URL(".", import.meta.url)),
   base: "/panel/",
@@ -17,7 +17,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    // en desarrollo, /assets/… se sirve desde el sitio público
+    // en desarrollo, /assets/… se sirve desde publico/
     fs: { allow: [raizRepo] },
     proxy: {},
   },
@@ -27,7 +27,7 @@ export default defineConfig({
       configureServer(servidor) {
         servidor.middlewares.use("/assets", (req, res, siguiente) => {
           void import("node:fs").then(({ createReadStream, existsSync }) => {
-            const ruta = `${raizRepo}assets${decodeURIComponent((req.url ?? "").split("?")[0] ?? "")}`;
+            const ruta = `${raizRepo}publico/assets${decodeURIComponent((req.url ?? "").split("?")[0] ?? "")}`;
             if (!existsSync(ruta)) return siguiente();
             createReadStream(ruta).pipe(res);
           });

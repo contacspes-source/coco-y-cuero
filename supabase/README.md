@@ -34,6 +34,7 @@ supabase/
 | 007_ajustes_del_auditor | Funciones auxiliares fuera de la API, índice faltante, políticas consolidadas |
 | 008_panel_admin | Bucket de fotos, regla precio/costo al confirmar, funciones `guardar_perfume` y `actualizar_precios` |
 | 009_restaurar_modo_diferido | Corrige un error de la 008 encontrado en pruebas |
+| 010_catalogo_publico | Vista de solo lectura que consume el sitio: publicados, sin costos |
 
 La 003, la 006 y la 009 corrigen errores de las anteriores. Se dejan así a propósito: una migración ya aplicada no se edita, se corrige con otra nueva. Así el historial cuenta lo que realmente pasó.
 
@@ -65,7 +66,7 @@ Es a propósito que no se pueda hacer desde la aplicación: ni tú ni nadie pued
 
 Pega `pruebas/seguridad.sql` completo en el SQL Editor y ejecútalo. Corre dentro de una transacción que se revierte, así que no deja datos.
 
-**Resultado esperado: 34 de 34 en OK.** Si alguna dice FALLA, no publiques el cambio.
+**Resultado esperado: 37 de 37 en OK.** Si alguna dice FALLA, no publiques el cambio.
 
 ## Números
 
@@ -75,5 +76,5 @@ Pega `pruebas/seguridad.sql` completo en el SQL Editor y ejecútalo. Corre dentr
 | Perfumes cargados | 53 |
 | Precios por debajo del costo | 0 |
 | Margen promedio sobre costo real | 47% |
-| Pruebas de seguridad | 34 de 34 |
+| Pruebas de seguridad | 37 de 37 |
 | Avisos de seguridad de Supabase | 0 |

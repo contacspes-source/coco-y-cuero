@@ -3,19 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Coco y Cuero · Perfumes árabes, nicho y diseñador</title>
+<title>Coco & Cuero · Perfumes árabes, nicho y diseñador</title>
 <meta name="description" content="Perfumes árabes, de nicho y de diseñador. Sobre pedido con entrega en Guadalajara, Zamora y Morelia, y envíos a todo México.">
 
-<meta property="og:title" content="Coco y Cuero · Perfumería">
+<meta property="og:title" content="Coco & Cuero · Perfumería">
 <meta property="og:description" content="Perfumes árabes, nicho y diseñador. Entregas en GDL, Zamora y Morelia.">
 <meta property="og:type" content="website">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
-<link rel="icon" href="assets/img/favicon.png" sizes="64x64">
-<link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
-<link rel="stylesheet" href="assets/styles.css">
+<link rel="icon" href="/assets/img/favicon.png" sizes="64x64">
+<link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
 
 <!-- PÍXEL DE META: pega aquí el código que te da Meta Business Suite cuando crees el píxel -->
 </head>
@@ -24,8 +23,8 @@
 <header class="encabezado">
   <div class="caja cabecera">
     <a class="marca" href="#inicio">
-      <img class="marca-sello" src="assets/img/logo-marca.png" alt="" width="46" height="46">
-      <span class="marca-texto">Coco y Cuero</span>
+      <img class="marca-sello" src="/assets/img/logo-marca.png" alt="" width="46" height="46">
+      <span class="marca-texto">Coco &amp; Cuero</span>
     </a>
     <nav class="cabecera-nav">
       <a href="#catalogo">Catálogo</a>
@@ -61,13 +60,10 @@
     <span class="nota-seccion" id="conteo" aria-live="polite"></span>
   </div>
 
+  <nav class="generos" id="generos" aria-label="Género"></nav>
+
   <div class="controles">
-    <div class="filtros" role="tablist" aria-label="Categorías">
-      <button class="pildora activa" data-cat="todos" role="tab" aria-selected="true">Todos</button>
-      <button class="pildora" data-cat="arabes" role="tab" aria-selected="false">Árabes</button>
-      <button class="pildora" data-cat="nicho" role="tab" aria-selected="false">Nicho</button>
-      <button class="pildora" data-cat="disenador" role="tab" aria-selected="false">Diseñador</button>
-    </div>
+    <div class="filtros" id="categorias" role="group" aria-label="Categoría"></div>
     <label class="buscador">
       <span class="solo-lectores">Buscar perfume</span>
       <svg class="buscador-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true">
@@ -77,14 +73,34 @@
     </label>
   </div>
 
-  <div class="rejilla" id="rejilla"></div>
+  <div class="aromas" role="group" aria-labelledby="aromas-titulo">
+    <span class="aromas-titulo" id="aromas-titulo">Aroma</span>
+    <div class="aromas-lista" id="aromas"></div>
+  </div>
+
+  <div class="resultados">
+    <p class="resultados-texto" id="resumen" aria-live="polite"></p>
+    <button class="limpiar" id="limpiar" type="button" hidden>Quitar filtros</button>
+    <label class="orden">
+      <span>Ordenar</span>
+      <select id="orden">
+        <option value="recomendados">Recomendados</option>
+        <option value="precio-menor">Precio: menor a mayor</option>
+        <option value="precio-mayor">Precio: mayor a menor</option>
+        <option value="nombre">Nombre</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="rejilla" id="rejilla" aria-busy="true"></div>
 
   <p class="vacio" id="vacio" hidden>
-    No tenemos ese perfume en el catálogo todavía. Escríbenos por WhatsApp y lo conseguimos.
+    <span id="vacio-texto">No tenemos ese perfume en el catálogo todavía.</span>
+    <a id="wa-vacio" href="#">Escríbenos por WhatsApp y lo conseguimos.</a>
   </p>
 
   <p class="aviso">
-    Los precios están sujetos a confirmación con el proveedor al momento del pedido. Las marcas mencionadas pertenecen a sus titulares; Coco y Cuero es un revendedor independiente y no está afiliado a ninguna casa de perfume.
+    Los precios están sujetos a confirmación con el proveedor al momento del pedido. Las marcas mencionadas pertenecen a sus titulares; Coco &amp; Cuero es un revendedor independiente y no está afiliado a ninguna casa de perfume.
   </p>
 </main>
 
@@ -137,7 +153,7 @@
 <footer class="pie">
   <div class="caja pie-caja">
     <div>
-      <img class="pie-logo" src="assets/img/logo-claro.png" alt="Coco y Cuero" width="190">
+      <img class="pie-logo" src="/assets/img/logo-claro.png" alt="Coco & Cuero" width="190">
       <p class="pie-chico">Perfumería · Guadalajara, Zamora y Morelia</p>
     </div>
     <div class="pie-chico pie-enlaces">
@@ -146,11 +162,11 @@
         <a href="#" id="ig-pie">Instagram</a>
         <a href="#" id="fb-pie">Facebook</a>
       </p>
-      <p>&copy; <span id="anio"></span> Coco y Cuero</p>
+      <p>&copy; <span id="anio"></span> Coco &amp; Cuero</p>
     </div>
   </div>
 </footer>
 
-<script src="assets/app.js"></script>
+<script type="module" src="./presentacion/main.ts"></script>
 </body>
 </html>

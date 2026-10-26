@@ -10,6 +10,7 @@ import type {
   Perfume,
   PerfumeEditable,
 } from "../../compartido/tipos";
+import { sinAcentos } from "../../compartido/texto";
 import { aplicarPorcentaje, margen, precioSugerido, semaforo, type Semaforo } from "./precios";
 
 // ------------------------------------------------------------------
@@ -32,10 +33,6 @@ export const FILTROS_INICIALES: FiltrosCatalogo = {
   alerta: "todas",
 };
 
-/** "Ámbar" y "ambar" deben encontrarse igual. */
-export function sinAcentos(s: string): string {
-  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-}
 
 /** El peor semáforo entre las presentaciones del perfume. */
 export function semaforoDe(p: Perfume): Semaforo {
@@ -228,12 +225,4 @@ export function hayCambios(a: PerfumeEditable, b: PerfumeEditable): boolean {
   return JSON.stringify(a) !== JSON.stringify(b);
 }
 
-/** "Lattafa", "Asad Bourbon" → "lattafa-asad-bourbon" */
-export function slug(...partes: string[]): string {
-  return (
-    sinAcentos(partes.join(" "))
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 80) || "perfume"
-  );
-}
+export { sinAcentos, slug } from "../../compartido/texto";

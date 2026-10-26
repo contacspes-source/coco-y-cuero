@@ -80,3 +80,25 @@ export interface Usuario {
   id: string;
   correo: string;
 }
+
+// ------------------------------------------------------------------
+// Sitio público (vista catalogo_publico: sin costos)
+// ------------------------------------------------------------------
+
+export interface NotaPublica {
+  nota: string;
+  familia: string | null;
+}
+
+export interface PerfumePublico {
+  id: number;
+  marca: string;
+  nombre: string;
+  tipo: TipoPerfume;
+  /** "caballero" | "dama" | "unisex" */
+  genero: string;
+  categoria: ClaveCategoria;
+  imagenUrl: string | null;
+  presentaciones: { ml: number; precio: number }[];
+  notas: NotaPublica[];
+}
