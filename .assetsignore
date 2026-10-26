@@ -6,3 +6,5 @@
 .assetsignore
 wrangler.jsonc
 README.md
+supabase
+supabase/**
