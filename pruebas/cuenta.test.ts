@@ -9,16 +9,25 @@ import {
   similares,
 } from "../sitio/negocio/catalogo";
 import {
+  DIRECCION_VACIA,
   ErrorDeValidacion,
   ServicioCuenta,
+  componerDireccion,
   etapasDe,
   normalizarTelefono,
   pedidosActivos,
+  precioConBienvenida,
+  primerNombre,
   sePuedeCancelar,
+  separarDireccion,
+  validarDireccion,
   validarRegistro,
   type DatosDeRegistro,
+  type Direccion,
+  type FormularioRegistro,
   type PedidoPropio,
 } from "../sitio/negocio/cuenta";
+import { OTRA_CIUDAD } from "../sitio/negocio/tienda";
 
 // ------------------------------------------------------------------
 // Detalle del perfume
@@ -91,17 +100,26 @@ describe("detalle del perfume", () => {
 // ------------------------------------------------------------------
 // Cuenta del cliente
 // ------------------------------------------------------------------
-const registro = (d: Partial<DatosDeRegistro> = {}): DatosDeRegistro => ({
+const registro = (d: Partial<FormularioRegistro> = {}): FormularioRegistro => ({
   nombre: "Ana Martínez",
   telefono: "33 1234 5678",
   correo: "ana@correo.mx",
   contrasena: "perfume2026",
   ciudad: "Zamora",
-  direccion: "",
+  direccion: { ...DIRECCION_VACIA },
   canal: "Instagram",
+  aceptaTerminos: true,
   ...d,
 });
-const campos = (d: DatosDeRegistro) => validarRegistro(d).map((x) => x.campo);
+const campos = (d: FormularioRegistro) => validarRegistro(d).map((x) => x.campo);
+const puebla: Direccion = {
+  calle: "Av. Juárez 120 int. 3",
+  colonia: "Centro",
+  cp: "72000",
+  municipio: "Puebla",
+  estado: "Puebla",
+  referencias: "Portón negro",
+};
 
 describe("registro", () => {
   test("datos completos", () => expect(campos(registro())).toEqual([]));
@@ -113,6 +131,12 @@ describe("registro", () => {
       "contrasena",
       "ciudad",
     ]));
+  test("sin aceptar términos no se crea", () => expect(campos(registro({ aceptaTerminos: false }))).toEqual(["terminos"]));
+  test("en las tres ciudades no se pide dirección", () => expect(campos(registro({ ciudad: "Morelia" }))).toEqual([]));
+  test("envío a otra ciudad exige dirección completa", () =>
+    expect(campos(registro({ ciudad: OTRA_CIUDAD }))).toEqual(["calle", "colonia", "cp", "municipio", "estado"]));
+  test("envío con dirección completa", () => expect(campos(registro({ ciudad: OTRA_CIUDAD, direccion: puebla }))).toEqual([]));
+  test("código postal de 4 dígitos", () => expect(validarDireccion({ ...puebla, cp: "7200" }).map((x) => x.campo)).toEqual(["cp"]));
   test("contraseña solo con letras", () => expect(campos(registro({ contrasena: "perfumesss" }))).toEqual(["contrasena"]));
   test("correo sin dominio", () => expect(campos(registro({ correo: "ana@correo" }))).toEqual(["correo"]));
   test.each([
@@ -122,11 +146,44 @@ describe("registro", () => {
   ])("teléfono %s", (t, e) => expect(normalizarTelefono(t)).toBe(e));
 });
 
+describe("dirección de envío", () => {
+  test("se compone legible", () =>
+    expect(componerDireccion(puebla)).toBe("Av. Juárez 120 int. 3 · Col. Centro · C.P. 72000 · Puebla, Puebla · Ref. Portón negro"));
+  test("ida y vuelta para editarla", () => expect(separarDireccion(componerDireccion(puebla))).toEqual(puebla));
+  test("sin referencias", () => {
+    const d = { ...puebla, referencias: "" };
+    expect(separarDireccion(componerDireccion(d))).toEqual(d);
+  });
+  test("municipio con coma", () => {
+    const d = { ...puebla, municipio: "San Pedro, Cholula" };
+    expect(separarDireccion(componerDireccion(d))).toEqual(d);
+  });
+  test("texto viejo libre cae en calle", () =>
+    expect(separarDireccion("Hidalgo 45, Zamora")).toEqual({ ...DIRECCION_VACIA, calle: "Hidalgo 45, Zamora" }));
+  test("un punto medio escrito por el cliente no rompe el formato", () => {
+    const d = { ...puebla, calle: "Calle 5 · Lote 2" };
+    expect(separarDireccion(componerDireccion(d)).calle).toBe("Calle 5 - Lote 2");
+  });
+});
+
+describe("bienvenida y saludo", () => {
+  test.each([
+    [1310, 1180],
+    [2090, 1880],
+    [999, 900],
+  ])("10 %% de %d redondeado a decenas = %d", (p, e) => expect(precioConBienvenida(p)).toBe(e));
+  test("primer nombre", () => expect(primerNombre("  jorge Duarte López ")).toBe("jorge"));
+  test("sin nombre usa el correo", () => expect(primerNombre(null, "ana.m@correo.mx")).toBe("ana.m"));
+  test("nombre larguísimo se recorta", () => expect(primerNombre("Maximilianoooooo")).toBe("Maximilianooo…"));
+});
+
 describe("estado de mis pedidos", () => {
   const ped = (x: Partial<PedidoPropio>): PedidoPropio => ({
     id: 1,
     estado: "consultado",
     precioPactado: 1000,
+    descuento: 0,
+    direccionEnvio: null,
     anticipo: 0,
     saldo: 1000,
     ciudadEntrega: null,
@@ -170,7 +227,9 @@ describe("estado de mis pedidos", () => {
 describe("ServicioCuenta", () => {
   const llamadas: unknown[][] = [];
   const repo = {
-    correoActual: async () => null,
+    sesionActual: async () => null,
+    descuentoBienvenida: async () => 0.1,
+    actualizarNombreDeSesion: async () => {},
     registrar: async (d: DatosDeRegistro) => (llamadas.push(["registrar", d]), { requiereConfirmacion: true }),
     entrar: async () => {},
     salir: async () => {},
@@ -202,6 +261,24 @@ describe("ServicioCuenta", () => {
 
   test("apartar manda notas vacías como null", async () => {
     expect(await s.apartar(10, "Zamora", "   ")).toBe(7);
-    expect(llamadas.at(-1)).toEqual(["solicitar", 10, "Zamora", null]);
+    expect(llamadas.at(-1)).toEqual(["solicitar", 10, "Zamora", null, null]);
+  });
+
+  test("envío a otra ciudad sin dirección no llega al servidor", async () => {
+    const antes = llamadas.length;
+    await expect(s.apartar(10, OTRA_CIUDAD, "")).rejects.toBeInstanceOf(ErrorDeValidacion);
+    expect(llamadas.length).toBe(antes);
+  });
+
+  test("envío manda la dirección compuesta", async () => {
+    await s.apartar(10, OTRA_CIUDAD, "", puebla);
+    expect(llamadas.at(-1)).toEqual(["solicitar", 10, OTRA_CIUDAD, null, componerDireccion(puebla)]);
+  });
+
+  test("el registro local no manda dirección y el de envío sí", async () => {
+    await s.registrar(registro({ direccion: puebla }), "/");
+    expect((llamadas.at(-1)![1] as DatosDeRegistro).direccion).toBe("");
+    await s.registrar(registro({ ciudad: OTRA_CIUDAD, direccion: puebla }), "/");
+    expect((llamadas.at(-1)![1] as DatosDeRegistro).direccion).toBe(componerDireccion(puebla));
   });
 });

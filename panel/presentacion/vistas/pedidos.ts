@@ -260,7 +260,17 @@ export function vistaPedido(id: number, navegar: (r: string) => void, alSesionVe
       }),
       h("div", { clase: "campo campo-saldo" }, h("label", null, "Saldo"), saldo),
     ),
-    h("div", { clase: "campos-2", style: undefined }, campo("Ciudad de entrega", ciudad), h("div")),
+    h(
+      "div",
+      { clase: "campos-2" },
+      campo("Ciudad de entrega", ciudad),
+      p.direccionEnvio
+        ? h("div", { clase: "campo dato-envio" }, h("label", null, "Dirección de envío"), h("p", null, p.direccionEnvio))
+        : h("div"),
+    ),
+    p.descuento > 0
+      ? h("p", { clase: "dato-descuento" }, `Primera compra: se aplicó 10 % de bienvenida (${fmtPesos(p.descuento)} menos que el precio de lista).`)
+      : null,
     campo("Notas del cliente", notas, { ayuda: "El cliente las ve en su cuenta." }),
     campo("Nota interna", notaInterna, { ayuda: "Privada. El cliente nunca la ve." }),
     h("div", { clase: "panel-pie" }, botonGuardar),

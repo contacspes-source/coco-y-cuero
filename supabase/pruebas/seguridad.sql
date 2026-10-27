@@ -5,7 +5,7 @@
 -- Supabase y ejecútalo. Todo corre dentro de una transacción que
 -- termina en ROLLBACK, así que NO deja datos de prueba.
 --
--- Resultado esperado: las 49 filas con estado = 'OK'.
+-- Resultado esperado: las 56 filas con estado = 'OK'.
 -- Si alguna dice 'FALLA', no publiques el cambio que hiciste.
 --
 -- Córrelas cada vez que toques una política RLS, un GRANT o una
@@ -316,6 +316,42 @@ begin
   set local role authenticated;
   select correo into r from public.clientes_admin() where nombre = 'Beto Prueba';
   reset role; insert into _p values (51,'admin ve clientes con correo','beto@prueba.mx',r);
+  -- =============================================================
+  -- 10 % de bienvenida (migración 013)
+  -- =============================================================
+  set local role anon;
+  begin perform public.mi_descuento_bienvenida(); r := 'EJECUTO';
+  exception when insufficient_privilege then r := 'bloqueado'; end;
+  reset role; insert into _p values (52,'anon pregunta por descuento','bloqueado',r);
+
+  -- Ana no tiene pedidos: le toca el 10 %
+  perform set_config('request.jwt.claims','{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}', true);
+  set local role authenticated;
+  r := public.mi_descuento_bienvenida()::text;
+  reset role; insert into _p values (53,'cuenta nueva tiene 10 %','0.10',r); set local role authenticated;
+
+  mio := public.solicitar_pedido(pres, 'Puebla', null, 'Calle 5 de Mayo 10 · C.P. 72000 · Puebla, Puebla');
+  select (precio_pactado = round((precio_pactado + descuento) * 0.9 / 10) * 10
+          and descuento > 0
+          and precio_pactado + descuento = (select precio_venta from public.presentacion where id = pres))::text
+    into r from public.pedido_detalle where id = mio;
+  reset role; insert into _p values (54,'primera compra con 10 % redondeado','true',r); set local role authenticated;
+
+  select coalesce(direccion_envio, 'vacía') into r from public.pedido_detalle where id = mio;
+  reset role; insert into _p values (55,'guarda dirección de envío','Calle 5 de Mayo 10 · C.P. 72000 · Puebla, Puebla',r); set local role authenticated;
+
+  r := public.mi_descuento_bienvenida()::text;
+  reset role; insert into _p values (56,'después de la primera ya no hay 10 %','0',r); set local role authenticated;
+
+  v := public.solicitar_pedido(pres);
+  select descuento::text into r from public.pedido_detalle where id = v;
+  reset role; insert into _p values (57,'segunda compra sin descuento','0',r); set local role authenticated;
+
+  -- si cancela todo, recupera su bienvenida
+  perform public.cancelar_mi_pedido(mio);
+  perform public.cancelar_mi_pedido(v);
+  r := public.mi_descuento_bienvenida()::text;
+  reset role; insert into _p values (58,'cancelar todo devuelve el 10 %','0.10',r);
 end $$;
 
 select n, prueba, esperado, obtenido,

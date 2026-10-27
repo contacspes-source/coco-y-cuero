@@ -13,7 +13,8 @@ import {
   precioDesde,
   similares,
 } from "../negocio/catalogo";
-import { FORMAS_DE_ENTREGA, FORMAS_DE_PAGO, GARANTIA, PASOS_DE_COMPRA } from "../negocio/tienda";
+import { precioConBienvenida } from "../negocio/cuenta";
+import { DESCUENTO_BIENVENIDA, FORMAS_DE_ENTREGA, FORMAS_DE_PAGO, GARANTIA, PASOS_DE_COMPRA } from "../negocio/tienda";
 import { linkWhatsApp } from "./config";
 import { iconoFamilia, iconoWhatsApp } from "./iconos";
 
@@ -23,6 +24,9 @@ export interface AccionesDetalle {
   apartar: (p: PerfumePublico, presentacion: PerfumePublico["presentaciones"][number]) => void;
   abrirOtro: (p: PerfumePublico) => void;
   enlace: (p: PerfumePublico) => string;
+  /** Para mostrar el 10 % de bienvenida (o invitar a crear cuenta). */
+  bienvenida: () => "invitado" | "disponible" | "usado";
+  crearCuenta: () => void;
 }
 
 function lista(titulo: string, elementos: readonly { titulo: string; texto: string }[], numerada = false): HTMLElement {
@@ -45,6 +49,8 @@ export function vistaDetalle(p: PerfumePublico, todos: PerfumePublico[], acc: Ac
   let elegida = p.presentaciones[0] ?? null;
 
   const precio = h("p", { clase: "det-precio" });
+  const bienvenida = h("p", { clase: "det-bienvenida" });
+  const porcentaje = `${Math.round(DESCUENTO_BIENVENIDA * 100)} %`;
   const whatsapp = h(
     "a",
     { clase: "boton boton-linea det-wa", target: "_blank", rel: "noopener" },
@@ -61,6 +67,19 @@ export function vistaDetalle(p: PerfumePublico, todos: PerfumePublico[], acc: Ac
   function elegir(pr: typeof elegida) {
     elegida = pr;
     precio.textContent = pr ? pesos.format(pr.precio) : "Consultar";
+    const estado = acc.bienvenida();
+    bienvenida.hidden = !pr || estado === "usado";
+    if (pr && estado === "disponible") {
+      bienvenida.replaceChildren(
+        h("strong", null, `Tu precio: ${pesos.format(precioConBienvenida(pr.precio))}`),
+        ` · ${porcentaje} de bienvenida en tu primera compra`,
+      );
+    } else if (pr && estado === "invitado") {
+      bienvenida.replaceChildren(
+        `${porcentaje} de descuento en tu primera compra con cuenta. `,
+        h("button", { type: "button", clase: "enlace", al: { click: acc.crearCuenta } }, "Crear cuenta"),
+      );
+    }
     whatsapp.setAttribute("href", linkWhatsApp(mensajeWhatsAppTamano(p, pr?.ml ?? 0)));
     apartar.disabled = !pr;
     for (const b of tamanos.querySelectorAll<HTMLButtonElement>("button")) {
@@ -123,9 +142,10 @@ export function vistaDetalle(p: PerfumePublico, todos: PerfumePublico[], acc: Ac
       h("h2", { clase: "det-nombre" }, p.nombre),
       h("p", { clase: "det-ficha" }, [TIPO_LARGO[p.tipo] ?? p.tipo, genero, categoria?.nombre].filter(Boolean).join(" · ")),
       precio,
+      bienvenida,
       p.presentaciones.length > 1 ? tamanos : p.presentaciones[0] ? h("p", { clase: "det-un-tamano" }, `Presentación de ${p.presentaciones[0].ml} ml`) : null,
       h("div", { clase: "det-acciones" }, apartar, whatsapp),
-      h("p", { clase: "det-aviso" }, "Sobre pedido. Confirmamos existencia antes de cobrarte."),
+      h("p", { clase: "det-aviso" }, "Sobre pedido. Te confirmamos disponibilidad antes de cobrarte."),
 
       h("section", { clase: "det-seccion" }, h("h3", null, "Descripción"), h("p", { clase: "det-descripcion" }, descripcionDe(p))),
 

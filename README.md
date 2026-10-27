@@ -49,7 +49,7 @@ Requiere Node.js 22 o más nuevo.
 npm install          # una sola vez
 npm run dev          # sitio en http://localhost:5174/
 npm run dev:panel    # panel en http://localhost:5173/panel/
-npm test             # 180 pruebas
+npm test             # 200 pruebas
 npm run build        # revisa tipos, compila y arma dist/
 ```
 
@@ -60,8 +60,8 @@ npm run build        # revisa tipos, compila y arma dist/
 ## Calidad
 
 - **TypeScript estricto**: errores de tipos frenan la compilación.
-- **180 pruebas automáticas**: motor de precios, validación, filtros, ajuste masivo, catálogo con la base caída, estados de pedido, registro de clientes, detalle del perfume, casos de uso con repositorios falsos y regla de capas.
-- **49 pruebas de seguridad en la base** (`supabase/pruebas/seguridad.sql`).
+- **200 pruebas automáticas**: motor de precios, validación, filtros, ajuste masivo, catálogo con la base caída, estados de pedido, registro de clientes, detalle del perfume, casos de uso con repositorios falsos y regla de capas.
+- **56 pruebas de seguridad en la base** (`supabase/pruebas/seguridad.sql`).
 - **GitHub Actions** corre todo en cada push; si algo falla, el commit sale en rojo.
 
 ## Agregar o cambiar perfumes
@@ -103,3 +103,5 @@ Tú lo registras en el panel ─┘        (anticipo)   (ya lo tienes)  (saldo c
 | Mensajes de WhatsApp por estado del pedido | `mensajeParaCliente` en `panel/negocio/ventas.ts` |
 | Teléfono, Instagram y Facebook | `sitio/presentacion/config.ts` |
 | Descripción de cada perfume | Panel → Catálogo → Editar |
+| Términos y condiciones de compra | `sitio/terminos.html` (cambia también la fecha de "Última actualización") |
+| Porcentaje de bienvenida (hoy 10 %) | `DESCUENTO_BIENVENIDA` en `sitio/negocio/tienda.ts` **y** `privado.porcentaje_bienvenida()` en la base: deben coincidir |

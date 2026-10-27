@@ -6,43 +6,164 @@ import { avisar, campo, conBotonOcupado, h, marcarErrores, vaciar } from "../../
 import { urlDeFoto } from "../../compartido/texto";
 import type { PerfumePublico } from "../../compartido/tipos";
 import {
+  ESTADOS_DE_MEXICO,
   ESTADO_CLIENTE,
   ErrorDeValidacion,
   LARGO_MINIMO_CONTRASENA,
   etapasDe,
   pedidosActivos,
+  precioConBienvenida,
+  primerNombre,
+  requiereDireccion,
   sePuedeCancelar,
+  separarDireccion,
+  type Direccion,
   type PedidoPropio,
   type Perfil,
+  type SesionActual,
 } from "../negocio/cuenta";
-import { cuenta } from "../negocio/servicio";
-import { CIUDADES, OTRA_CIUDAD } from "../negocio/tienda";
+import { cuenta, enlaceAlAbrir } from "../negocio/servicio";
+import { CIUDADES, DESCUENTO_BIENVENIDA, OTRA_CIUDAD } from "../negocio/tienda";
 import { linkWhatsApp } from "./config";
 import { abrirHoja, cerrarHoja, type Hoja } from "./hoja";
 
 const pesos = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 });
 const fecha = new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short" });
 
-let correo: string | null = null;
+let sesion: SesionActual | null = null;
+/** 0.1 mientras la cuenta no tenga su primera compra; 0 después. */
+let descuento = 0;
 let botonCabecera: HTMLButtonElement | null = null;
+let barraPromo: HTMLElement | null = null;
 let alCambiarSesion: () => void = () => {};
 
 const mensaje = (e: unknown) => (e instanceof Error ? e.message : "Ocurrió un error. Inténtalo de nuevo.");
 const volverAqui = () => `${location.origin}/`;
+const PORCENTAJE = `${Math.round(DESCUENTO_BIENVENIDA * 100)} %`;
 
-function actualizarBoton() {
-  if (!botonCabecera) return;
-  botonCabecera.textContent = correo ? "Mi cuenta" : "Entrar";
-  botonCabecera.classList.toggle("con-sesion", Boolean(correo));
+export const haySesion = () => sesion !== null;
+
+/**
+ * Qué decirle al cliente sobre su 10 %: "invitado" (sin sesión: invítalo a
+ * entrar), "disponible" (con sesión y sin compras) o "usado".
+ */
+export function estadoBienvenida(): "invitado" | "disponible" | "usado" {
+  if (!sesion) return "invitado";
+  return descuento > 0 ? "disponible" : "usado";
 }
 
-export const haySesion = () => correo !== null;
+function nombreCorto(): string {
+  return sesion ? primerNombre(sesion.nombre, sesion.correo) : "";
+}
+
+function actualizarBoton() {
+  if (botonCabecera) {
+    vaciar(
+      botonCabecera,
+      sesion ? h("span", { clase: "cuenta-hola" }, "Hola, ", h("strong", null, nombreCorto())) : document.createTextNode("Entrar"),
+    );
+    botonCabecera.classList.toggle("con-sesion", Boolean(sesion));
+    botonCabecera.setAttribute("aria-label", sesion ? `Mi cuenta de ${nombreCorto()}` : "Entrar a mi cuenta");
+  }
+  pintarPromo();
+}
+
+/** Hasta saber si hay sesión guardada no pintamos la franja (evita un parpadeo). */
+let sesionResuelta = false;
+let promoCerrada = false;
+try {
+  promoCerrada = sessionStorage.getItem("promo-cerrada") === "1";
+} catch {
+  /* sin almacenamiento: se muestra siempre */
+}
+
+/** La franja de arriba: invita a entrar (10 %) o recuerda el descuento. */
+function pintarPromo() {
+  if (!barraPromo) return;
+  const estado = estadoBienvenida();
+  if (!sesionResuelta || promoCerrada || estado === "usado") {
+    barraPromo.hidden = true;
+    return;
+  }
+  const cerrar = h(
+    "button",
+    {
+      type: "button",
+      clase: "promo-cerrar",
+      "aria-label": "Cerrar aviso",
+      al: {
+        click: () => {
+          promoCerrada = true;
+          try {
+            sessionStorage.setItem("promo-cerrada", "1");
+          } catch {
+            /* nada */
+          }
+          pintarPromo();
+        },
+      },
+    },
+    "×",
+  );
+  if (estado === "invitado") {
+    vaciar(
+      barraPromo,
+      h(
+        "p",
+        null,
+        h("strong", null, "¿Ya iniciaste sesión? "),
+        `Crea tu cuenta y llévate ${PORCENTAJE} de descuento en tu primera compra.`,
+      ),
+      h(
+        "div",
+        { clase: "promo-acciones" },
+        h("button", { type: "button", clase: "promo-boton", al: { click: () => abrirRegistro() } }, "Crear cuenta"),
+        h("button", { type: "button", clase: "promo-enlace", al: { click: () => abrirEntrar() } }, "Iniciar sesión"),
+      ),
+      cerrar,
+    );
+  } else {
+    vaciar(
+      barraPromo,
+      h(
+        "p",
+        null,
+        h("strong", null, `Hola, ${nombreCorto()}: `),
+        `tienes ${PORCENTAJE} de descuento en tu primera compra. Se aplica solo al apartar.`,
+      ),
+      cerrar,
+    );
+  }
+  barraPromo.hidden = false;
+}
+
+async function refrescarSesion() {
+  sesion = await cuenta.sesionActual().catch(() => null);
+  sesionResuelta = true;
+  descuento = 0;
+  if (sesion) {
+    try {
+      descuento = await cuenta.descuentoBienvenida();
+    } catch {
+      /* si falla, no prometemos descuento */
+    }
+  }
+  actualizarBoton();
+  alCambiarSesion();
+}
 
 /** Se llama al cargar la página: restaura la sesión si existe. */
-export async function iniciarCuenta(boton: HTMLButtonElement, conSesionPrevia: boolean, alCambiar: () => void) {
+export async function iniciarCuenta(
+  boton: HTMLButtonElement,
+  promo: HTMLElement | null,
+  conSesionPrevia: boolean,
+  alCambiar: () => void,
+) {
   botonCabecera = boton;
+  barraPromo = promo;
   alCambiarSesion = alCambiar;
-  boton.addEventListener("click", () => (correo ? abrirMiCuenta() : abrirEntrar()));
+  boton.addEventListener("click", () => (sesion ? abrirMiCuenta() : abrirEntrar()));
+  sesionResuelta = !conSesionPrevia;
   actualizarBoton();
   if (!conSesionPrevia) return;
   await prepararSesion();
@@ -54,17 +175,25 @@ async function prepararSesion() {
   preparada = true;
   await cuenta.alCambiar(async (evento) => {
     if (evento === "recuperar-contrasena") abrirNuevaContrasena();
-    if (evento === "salio") correo = null;
-    if (evento === "entro") correo = await cuenta.correoActual();
-    actualizarBoton();
-    alCambiarSesion();
+    if (evento === "salio") {
+      sesion = null;
+      descuento = 0;
+      actualizarBoton();
+      alCambiarSesion();
+    }
+    if (evento === "entro") await refrescarSesion();
   });
-  correo = await cuenta.correoActual();
-  actualizarBoton();
-  // venimos del enlace de confirmación del correo
-  if (correo && /type=signup/.test(location.hash)) {
+  await refrescarSesion();
+
+  // venimos de un enlace del correo: Supabase ya leyó el #token
+  if (enlaceAlAbrir && enlaceAlAbrir !== "contrasena") {
     history.replaceState(null, "", location.pathname + location.search);
-    avisar("¡Cuenta confirmada! Ya puedes apartar perfumes.", "exito");
+    if (enlaceAlAbrir === "vencido" && !sesion) {
+      abrirEntrar(undefined, "Ese enlace ya venció o ya se usó. Entra con tu correo y contraseña.");
+    } else if (sesion) {
+      avisar(`¡Cuenta confirmada! Bienvenido, ${nombreCorto()}.`, "exito");
+      void abrirMiCuenta();
+    }
   }
 }
 
@@ -89,6 +218,47 @@ function selectorCiudad(valor: string | null): HTMLSelectElement {
   );
   s.value = valor && [...CIUDADES, OTRA_CIUDAD].includes(valor) ? valor : valor ? OTRA_CIUDAD : "";
   return s;
+}
+
+/**
+ * Los campos de dirección completa. Solo se muestran cuando la entrega
+ * es por envío a otra ciudad; en GDL, Zamora y Morelia no hacen falta.
+ */
+function camposDireccion(inicial: Direccion, ciudad: HTMLSelectElement) {
+  const calle = h("input", { value: inicial.calle, autocomplete: "address-line1", maxlength: 120, placeholder: "Av. Juárez 120 int. 3" });
+  const colonia = h("input", { value: inicial.colonia, autocomplete: "address-level3", maxlength: 80 });
+  const cp = h("input", { value: inicial.cp, autocomplete: "postal-code", inputmode: "numeric", maxlength: 5, placeholder: "00000" });
+  const municipio = h("input", { value: inicial.municipio, autocomplete: "address-level2", maxlength: 60 });
+  const estado = h(
+    "select",
+    { autocomplete: "address-level1" },
+    h("option", { value: "" }, "Elige…"),
+    ESTADOS_DE_MEXICO.map((e) => h("option", { value: e }, e)),
+  );
+  estado.value = inicial.estado;
+  const referencias = h("input", { value: inicial.referencias, maxlength: 80, placeholder: "Opcional: entre calles, color de fachada" });
+  const nodo = h(
+    "fieldset",
+    { clase: "cta-direccion" },
+    h("legend", null, "Dirección de envío"),
+    h("p", { clase: "cta-nota" }, "Solo para envíos por paquetería a otra ciudad de la república."),
+    campo("Calle y número", calle, { nombre: "calle" }),
+    h("div", { clase: "cta-dos" }, campo("Colonia", colonia, { nombre: "colonia" }), campo("Código postal", cp, { nombre: "cp" })),
+    h("div", { clase: "cta-dos" }, campo("Ciudad o municipio", municipio, { nombre: "municipio" }), campo("Estado", estado, { nombre: "estado" })),
+    campo("Referencias", referencias, { nombre: "referencias" }),
+  );
+  const sincronizar = () => (nodo.hidden = !requiereDireccion(ciudad.value));
+  ciudad.addEventListener("change", sincronizar);
+  sincronizar();
+  const leer = (): Direccion => ({
+    calle: calle.value,
+    colonia: colonia.value,
+    cp: cp.value,
+    municipio: municipio.value,
+    estado: estado.value,
+    referencias: referencias.value,
+  });
+  return { nodo, leer };
 }
 
 async function manejar(form: HTMLFormElement, error: HTMLElement, boton: HTMLButtonElement, texto: string, tarea: () => Promise<void>) {
@@ -120,9 +290,7 @@ export function abrirEntrar(continuar?: () => void, aviso?: string) {
           void manejar(form, error, boton, "Entrando…", async () => {
             await prepararSesion();
             await cuenta.entrar(correoIn.value, clave.value);
-            correo = await cuenta.correoActual();
-            actualizarBoton();
-            alCambiarSesion();
+            await refrescarSesion();
             if (continuar) continuar();
             else abrirMiCuenta();
           });
@@ -151,7 +319,7 @@ export function abrirEntrar(continuar?: () => void, aviso?: string) {
     ),
   );
   hoja.pintar(
-    ...encabezado("Entrar", aviso ?? "Aparta perfumes y sigue tus pedidos."),
+    ...encabezado("Entrar", aviso ?? `Aparta perfumes, sigue tus pedidos y obtén ${PORCENTAJE} en tu primera compra.`),
     form,
     h("p", { clase: "cta-cambio" }, "¿Primera vez? ", h("button", { type: "button", clase: "enlace", al: { click: () => abrirRegistro(continuar) } }, "Crea tu cuenta")),
   );
@@ -175,13 +343,14 @@ export async function abrirRegistro(continuar?: () => void) {
   const correoIn = h("input", { type: "email", autocomplete: "email", inputmode: "email" });
   const clave = h("input", { type: "password", autocomplete: "new-password" });
   const ciudad = selectorCiudad(null);
-  const direccion = h("input", { autocomplete: "street-address", maxlength: 200, placeholder: "Opcional, para entregas a domicilio" });
+  const direccion = camposDireccion(separarDireccion(null), ciudad);
   const canal = h(
     "select",
     null,
     h("option", { value: "" }, "Elige…"),
     canales.map((c) => h("option", { value: c.nombre }, c.nombre)),
   );
+  const acepta = h("input", { type: "checkbox" });
   const error = errorGeneral();
   const boton = h("button", { clase: "boton boton-oscuro boton-ancho", type: "submit" }, "Crear mi cuenta");
 
@@ -201,8 +370,9 @@ export async function abrirRegistro(continuar?: () => void) {
                 correo: correoIn.value,
                 contrasena: clave.value,
                 ciudad: ciudad.value,
-                direccion: direccion.value,
+                direccion: direccion.leer(),
                 canal: canal.value,
+                aceptaTerminos: acepta.checked,
               },
               volverAqui(),
             );
@@ -213,9 +383,7 @@ export async function abrirRegistro(continuar?: () => void) {
                 h("button", { clase: "boton boton-linea boton-ancho", type: "button", al: { click: cerrarHoja } }, "Seguir viendo perfumes"),
               );
             } else {
-              correo = await cuenta.correoActual();
-              actualizarBoton();
-              alCambiarSesion();
+              await refrescarSesion();
               avisar("¡Bienvenido a Coco & Cuero!", "exito");
               if (continuar) continuar();
               else abrirMiCuenta();
@@ -229,13 +397,30 @@ export async function abrirRegistro(continuar?: () => void) {
     campo("Correo", correoIn, { nombre: "correo" }),
     campo("Contraseña", clave, { nombre: "contrasena", ayuda: `Al menos ${LARGO_MINIMO_CONTRASENA} caracteres, con letras y números.` }),
     h("div", { clase: "cta-dos" }, campo("Ciudad", ciudad, { nombre: "ciudad" }), campo("¿Cómo nos conociste?", canal, { nombre: "canal" })),
-    campo("Dirección", direccion, { nombre: "direccion" }),
+    direccion.nodo,
+    h(
+      "div",
+      { clase: "campo cta-acepto", dataset: { campo: "terminos" } },
+      h(
+        "label",
+        null,
+        acepta,
+        h(
+          "span",
+          null,
+          "Acepto los ",
+          h("a", { href: "/terminos.html", target: "_blank", rel: "noopener" }, "términos y condiciones de compra"),
+          ".",
+        ),
+      ),
+      h("p", { clase: "campo-error", role: "alert" }),
+    ),
     error,
     boton,
     h("p", { clase: "cta-nota" }, "Usamos tus datos solo para tus pedidos. Nunca los compartimos."),
   );
   hoja.pintar(
-    ...encabezado("Crear cuenta", "Recibes tu número de cliente y puedes apartar perfumes en línea."),
+    ...encabezado("Crear cuenta", `Recibes tu número de cliente, apartas en línea y te llevas ${PORCENTAJE} de descuento en tu primera compra.`),
     form,
     h("p", { clase: "cta-cambio" }, "¿Ya tienes cuenta? ", h("button", { type: "button", clase: "enlace", al: { click: () => abrirEntrar(continuar) } }, "Entra")),
   );
@@ -318,6 +503,10 @@ function tarjetaPedido(p: PedidoPropio, alCambiar: () => void): HTMLElement {
       h("div", null, h("dt", null, "Anticipo"), h("dd", null, pesos.format(p.anticipo))),
       h("div", null, h("dt", null, "Por pagar"), h("dd", null, pesos.format(p.saldo))),
     ),
+    p.descuento > 0
+      ? h("p", { clase: "pedido-extra" }, `Incluye tu ${PORCENTAJE} de bienvenida: ahorraste ${pesos.format(p.descuento)}.`)
+      : null,
+    p.direccionEnvio ? h("p", { clase: "pedido-extra" }, `Envío a: ${p.direccionEnvio}`) : null,
     h(
       "div",
       { clase: "pedido-acciones" },
@@ -343,6 +532,7 @@ function tarjetaPedido(p: PedidoPropio, alCambiar: () => void): HTMLElement {
                   try {
                     await conBotonOcupado(b, "Cancelando…", () => cuenta.cancelar(p.id));
                     avisar(`Pedido #${p.id} cancelado.`, "info");
+                    await refrescarSesion();
                     alCambiar();
                   } catch (e) {
                     avisar(mensaje(e), "error");
@@ -361,7 +551,7 @@ function formularioDatos(perfil: Perfil, canales: { id: number; nombre: string }
   const nombre = h("input", { value: perfil.nombre, autocomplete: "name" });
   const telefono = h("input", { type: "tel", value: perfil.telefono ?? "", autocomplete: "tel" });
   const ciudad = selectorCiudad(perfil.ciudad);
-  const direccion = h("input", { value: perfil.direccion ?? "", autocomplete: "street-address", maxlength: 200 });
+  const direccion = camposDireccion(separarDireccion(perfil.direccion), ciudad);
   const canal = h(
     "select",
     null,
@@ -380,13 +570,15 @@ function formularioDatos(perfil: Perfil, canales: { id: number; nombre: string }
         submit: (e) => {
           e.preventDefault();
           void manejar(form, error, boton, "Guardando…", async () => {
-            await cuenta.guardarPerfil({
+            const nuevo = await cuenta.guardarPerfil({
               nombre: nombre.value,
               telefono: telefono.value,
               ciudad: ciudad.value,
-              direccion: direccion.value,
+              direccion: direccion.leer(),
               canalId: canal.value ? Number(canal.value) : null,
             });
+            if (sesion) sesion = { ...sesion, nombre: nuevo };
+            actualizarBoton();
             avisar("Datos guardados.", "exito");
             alGuardar();
           });
@@ -396,7 +588,7 @@ function formularioDatos(perfil: Perfil, canales: { id: number; nombre: string }
     campo("Nombre completo", nombre, { nombre: "nombre" }),
     campo("WhatsApp", telefono, { nombre: "telefono" }),
     h("div", { clase: "cta-dos" }, campo("Ciudad", ciudad, { nombre: "ciudad" }), campo("¿Cómo nos conociste?", canal)),
-    campo("Dirección", direccion, { nombre: "direccion" }),
+    direccion.nodo,
     h("p", { clase: "cta-nota" }, `Correo de la cuenta: ${perfil.correo}`),
     error,
     boton,
@@ -418,7 +610,7 @@ export async function abrirMiCuenta(pestana: "pedidos" | "datos" = "pedidos") {
     return;
   }
   if (!perfil) {
-    correo = null;
+    sesion = null;
     actualizarBoton();
     abrirEntrar();
     return;
@@ -460,7 +652,10 @@ function pintarCuenta(hoja: Hoja, perfil: Perfil, pedidos: PedidoPropio[], canal
   const activos = pedidosActivos(pedidos);
   hoja.pintar(
     h("p", { clase: "rotulo" }, "Mi cuenta"),
-    h("h2", { clase: "cta-titulo" }, `Hola, ${perfil.nombre.split(" ")[0]}`),
+    h("h2", { clase: "cta-titulo" }, `Hola, ${primerNombre(perfil.nombre)}`),
+    ...(estadoBienvenida() === "disponible"
+      ? [h("p", { clase: "cta-bienvenida" }, `Tienes ${PORCENTAJE} de descuento en tu primera compra. Se aplica solo al apartar.`)]
+      : []),
     h(
       "div",
       { clase: "cta-tarjeta" },
@@ -477,7 +672,8 @@ function pintarCuenta(hoja: Hoja, perfil: Perfil, pedidos: PedidoPropio[], canal
         al: {
           click: async () => {
             await cuenta.salir();
-            correo = null;
+            sesion = null;
+            descuento = 0;
             actualizarBoton();
             alCambiarSesion();
             cerrarHoja();
@@ -493,7 +689,7 @@ function pintarCuenta(hoja: Hoja, perfil: Perfil, pedidos: PedidoPropio[], canal
 
 // ------------------------------------------------------------ apartar
 export async function abrirApartar(p: PerfumePublico, pr: PerfumePublico["presentaciones"][number], volver: () => void) {
-  if (!correo) {
+  if (!sesion) {
     abrirEntrar(() => void abrirApartar(p, pr, volver), "Entra o crea tu cuenta para apartar. Es rápido.");
     return;
   }
@@ -507,6 +703,9 @@ export async function abrirApartar(p: PerfumePublico, pr: PerfumePublico["presen
   }
   const foto = urlDeFoto(p.imagenUrl);
   const ciudad = selectorCiudad(perfil?.ciudad ?? null);
+  const direccion = camposDireccion(separarDireccion(perfil?.direccion ?? null), ciudad);
+  const conDescuento = descuento > 0;
+  const precioFinal = conDescuento ? precioConBienvenida(pr.precio, descuento) : pr.precio;
   const notas = h("textarea", { rows: 3, maxlength: 500, placeholder: "Opcional: es para regalo, horario para entregar, etc." });
   const error = errorGeneral();
   const boton = h("button", { clase: "boton boton-oscuro boton-ancho", type: "submit" }, "Confirmar solicitud");
@@ -519,12 +718,17 @@ export async function abrirApartar(p: PerfumePublico, pr: PerfumePublico["presen
         submit: (e) => {
           e.preventDefault();
           void manejar(form, error, boton, "Enviando…", async () => {
-            const id = await cuenta.apartar(pr.id, ciudad.value || null, notas.value);
+            const id = await cuenta.apartar(pr.id, ciudad.value || null, notas.value, direccion.leer());
+            if (conDescuento) {
+              descuento = 0;
+              actualizarBoton();
+              alCambiarSesion();
+            }
             const texto = `Hola, soy ${perfil?.nombre ?? ""} (cliente #${perfil?.numeroCliente ?? ""}). Acabo de apartar en la página el pedido #${id}: ${p.marca} ${p.nombre} ${pr.ml} ml.`;
             hoja.pintar(
               h("p", { clase: "rotulo" }, "Listo"),
               h("h2", { clase: "cta-titulo" }, `Pedido #${id} solicitado`),
-              h("p", { clase: "cta-texto" }, "No se te cobró nada. Te escribimos por WhatsApp para confirmar existencia, fecha y anticipo."),
+              h("p", { clase: "cta-texto" }, "No se te cobró nada. Te escribimos por WhatsApp para acordar la compra y la fecha de entrega."),
               h("p", { clase: "cta-texto" }, "¿Lo quieres más rápido? Avísanos tú:"),
               h("a", { clase: "boton boton-oscuro boton-ancho", target: "_blank", rel: "noopener", href: linkWhatsApp(texto) }, "Avisar por WhatsApp"),
               h("button", { type: "button", clase: "boton boton-linea boton-ancho", al: { click: () => abrirMiCuenta() } }, "Ver mis pedidos"),
@@ -534,10 +738,11 @@ export async function abrirApartar(p: PerfumePublico, pr: PerfumePublico["presen
       },
     },
     campo("Ciudad de entrega", ciudad, { nombre: "ciudad" }),
+    direccion.nodo,
     campo("Notas para nosotros", notas, { nombre: "notas" }),
     error,
     boton,
-    h("p", { clase: "cta-nota" }, "Al confirmar no se cobra nada. Primero verificamos existencia con el proveedor."),
+    h("p", { clase: "cta-nota" }, "Al confirmar no se cobra nada. Te escribimos por WhatsApp para acordar la compra."),
   );
   hoja.pintar(
     h("button", { type: "button", clase: "enlace cta-volver", al: { click: volver } }, `← ${p.nombre}`),
@@ -551,7 +756,17 @@ export async function abrirApartar(p: PerfumePublico, pr: PerfumePublico["presen
         null,
         h("p", { clase: "ficha-marca" }, p.marca),
         h("p", { clase: "cta-resumen-nombre" }, p.nombre),
-        h("p", { clase: "cta-resumen-precio" }, `${pr.ml} ml · ${pesos.format(pr.precio)}`),
+        conDescuento
+          ? h(
+              "p",
+              { clase: "cta-resumen-precio" },
+              `${pr.ml} ml · `,
+              h("s", null, pesos.format(pr.precio)),
+              " ",
+              h("strong", null, pesos.format(precioFinal)),
+            )
+          : h("p", { clase: "cta-resumen-precio" }, `${pr.ml} ml · ${pesos.format(pr.precio)}`),
+        conDescuento ? h("p", { clase: "cta-resumen-descuento" }, `${PORCENTAJE} de bienvenida por tu primera compra`) : null,
       ),
     ),
     form,

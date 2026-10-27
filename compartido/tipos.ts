@@ -143,9 +143,13 @@ export interface PedidoAdmin {
   id: number;
   estado: EstadoPedido;
   precioPactado: number;
+  /** Lo que se descontó del precio de lista (10 % de bienvenida). */
+  descuento: number;
   anticipo: number;
   saldo: number;
   ciudadEntrega: string | null;
+  /** Solo en envíos por paquetería a otra ciudad. */
+  direccionEnvio: string | null;
   notas: string | null;
   notaInterna: string | null;
   creadoEn: string;

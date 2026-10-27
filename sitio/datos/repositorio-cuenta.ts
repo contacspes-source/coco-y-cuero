@@ -26,10 +26,18 @@ export interface Perfil {
   correo: string;
 }
 
+export interface SesionActual {
+  correo: string;
+  /** El nombre con que se registró (metadatos de la cuenta). */
+  nombre: string | null;
+}
+
 export interface PedidoPropio {
   id: number;
   estado: string;
   precioPactado: number;
+  descuento: number;
+  direccionEnvio: string | null;
   anticipo: number;
   saldo: number;
   ciudadEntrega: string | null;
@@ -50,10 +58,19 @@ function revisar<T>(r: { data: T | null; error: unknown }): T {
 }
 
 export class RepositorioCuenta {
-  async correoActual(): Promise<string | null> {
+  async sesionActual(): Promise<SesionActual | null> {
     const db = await supabase();
     const { data } = await db.auth.getSession();
-    return data.session?.user.email ?? null;
+    const u = data.session?.user;
+    if (!u) return null;
+    const nombre = (u.user_metadata as { nombre?: unknown } | undefined)?.nombre;
+    return { correo: u.email ?? "", nombre: typeof nombre === "string" ? nombre : null };
+  }
+
+  /** 0.1 si la cuenta aún no tiene compras (sin contar canceladas), 0 si ya tiene. */
+  async descuentoBienvenida(): Promise<number> {
+    const db = await supabase();
+    return Number(revisar(await db.rpc("mi_descuento_bienvenida")) ?? 0);
   }
 
   async registrar(d: DatosDeRegistro, volverA: string): Promise<{ requiereConfirmacion: boolean }> {
@@ -104,6 +121,12 @@ export class RepositorioCuenta {
     const db = await supabase();
     const { error } = await db.auth.updateUser({ password: nueva });
     if (error) throw traducirError(error);
+  }
+
+  /** Mantiene el saludo de la cabecera al día cuando cambia su nombre. */
+  async actualizarNombreDeSesion(nombre: string): Promise<void> {
+    const db = await supabase();
+    await db.auth.updateUser({ data: { nombre } });
   }
 
   async alCambiar(escucha: (e: EventoDeCuenta) => void): Promise<void> {
@@ -169,13 +192,15 @@ export class RepositorioCuenta {
     const filas = revisar(
       await db
         .from("pedido_detalle")
-        .select("id, estado, precio_pactado, anticipo, saldo, ciudad_entrega, notas, creado_en, ml, perfume, marca, imagen_url, historial")
+        .select("id, estado, precio_pactado, descuento, direccion_envio, anticipo, saldo, ciudad_entrega, notas, creado_en, ml, perfume, marca, imagen_url, historial")
         .order("creado_en", { ascending: false }),
     ) as Record<string, unknown>[];
     return filas.map((f) => ({
       id: Number(f.id),
       estado: String(f.estado),
       precioPactado: Number(f.precio_pactado),
+      descuento: Number(f.descuento ?? 0),
+      direccionEnvio: (f.direccion_envio as string | null) ?? null,
       anticipo: Number(f.anticipo),
       saldo: Number(f.saldo),
       ciudadEntrega: (f.ciudad_entrega as string | null) ?? null,
@@ -189,12 +214,13 @@ export class RepositorioCuenta {
     }));
   }
 
-  async solicitar(presentacionId: number, ciudad: string | null, notas: string | null): Promise<number> {
+  async solicitar(presentacionId: number, ciudad: string | null, notas: string | null, direccion: string | null): Promise<number> {
     const db = await supabase();
     const r = await db.rpc("solicitar_pedido", {
       p_presentacion_id: presentacionId,
       p_ciudad_entrega: ciudad,
       p_notas: notas,
+      p_direccion: direccion,
     });
     return Number(revisar(r));
   }

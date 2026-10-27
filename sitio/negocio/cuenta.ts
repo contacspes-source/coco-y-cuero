@@ -5,10 +5,18 @@
  * constructor para poder probarse con uno falso.
  */
 import { ErrorDeDatos, ErrorDeValidacion, type ProblemaDeCampo } from "../../compartido/errores";
-import type { DatosDeRegistro, EventoDeCuenta, PedidoPropio, Perfil, RepositorioCuenta } from "../datos/repositorio-cuenta";
+import type {
+  DatosDeRegistro,
+  EventoDeCuenta,
+  PedidoPropio,
+  Perfil,
+  RepositorioCuenta,
+  SesionActual,
+} from "../datos/repositorio-cuenta";
+import { DESCUENTO_BIENVENIDA, OTRA_CIUDAD } from "./tienda";
 
 export { ErrorDeDatos, ErrorDeValidacion };
-export type { DatosDeRegistro, EventoDeCuenta, PedidoPropio, Perfil, ProblemaDeCampo };
+export type { DatosDeRegistro, EventoDeCuenta, PedidoPropio, Perfil, ProblemaDeCampo, SesionActual };
 
 export const LARGO_MINIMO_CONTRASENA = 8;
 
@@ -21,7 +29,92 @@ export function normalizarTelefono(texto: string): string | null {
 
 const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
-export function validarRegistro(d: DatosDeRegistro): ProblemaDeCampo[] {
+// ------------------------------------------------------------------
+// Dirección de envío: solo se pide para envíos a otra ciudad de la
+// república. En Guadalajara, Zamora y Morelia se entrega en un punto
+// acordado por WhatsApp, así que no hace falta.
+// ------------------------------------------------------------------
+
+export interface Direccion {
+  calle: string;
+  colonia: string;
+  cp: string;
+  municipio: string;
+  estado: string;
+  referencias: string;
+}
+
+export const DIRECCION_VACIA: Direccion = { calle: "", colonia: "", cp: "", municipio: "", estado: "", referencias: "" };
+
+export const ESTADOS_DE_MEXICO = [
+  "Aguascalientes", "Baja California", "Baja California Sur", "Campeche", "Chiapas", "Chihuahua",
+  "Ciudad de México", "Coahuila", "Colima", "Durango", "Estado de México", "Guanajuato", "Guerrero",
+  "Hidalgo", "Jalisco", "Michoacán", "Morelos", "Nayarit", "Nuevo León", "Oaxaca", "Puebla",
+  "Querétaro", "Quintana Roo", "San Luis Potosí", "Sinaloa", "Sonora", "Tabasco", "Tamaulipas",
+  "Tlaxcala", "Veracruz", "Yucatán", "Zacatecas",
+] as const;
+
+export const LARGO_MAXIMO_DIRECCION = 300;
+const SEPARADOR = " · ";
+
+export const requiereDireccion = (ciudad: string | null) => ciudad === OTRA_CIUDAD;
+
+const limpio = (t: string) => t.trim().replace(/\s+/g, " ").replaceAll("·", "-");
+
+export function validarDireccion(d: Direccion): ProblemaDeCampo[] {
+  const p: ProblemaDeCampo[] = [];
+  if (limpio(d.calle).length < 4) p.push({ campo: "calle", mensaje: "Calle y número." });
+  if (limpio(d.colonia).length < 2) p.push({ campo: "colonia", mensaje: "Escribe la colonia." });
+  if (!/^\d{5}$/.test(d.cp.trim())) p.push({ campo: "cp", mensaje: "Código postal de 5 dígitos." });
+  if (limpio(d.municipio).length < 2) p.push({ campo: "municipio", mensaje: "Ciudad o municipio." });
+  if (!(ESTADOS_DE_MEXICO as readonly string[]).includes(d.estado)) p.push({ campo: "estado", mensaje: "Elige el estado." });
+  if (!p.length && componerDireccion(d).length > LARGO_MAXIMO_DIRECCION) {
+    p.push({ campo: "referencias", mensaje: "Acorta las referencias." });
+  }
+  return p;
+}
+
+/** "Av. Juárez 120 · Col. Centro · C.P. 72000 · Puebla, Puebla · Ref. portón negro" */
+export function componerDireccion(d: Direccion): string {
+  const partes = [
+    limpio(d.calle),
+    `Col. ${limpio(d.colonia)}`,
+    `C.P. ${d.cp.trim()}`,
+    `${limpio(d.municipio)}, ${d.estado}`,
+  ];
+  if (limpio(d.referencias)) partes.push(`Ref. ${limpio(d.referencias)}`);
+  return partes.join(SEPARADOR);
+}
+
+/** El camino de regreso para editar. Un texto libre viejo cae completo en "calle". */
+export function separarDireccion(texto: string | null): Direccion {
+  if (!texto) return { ...DIRECCION_VACIA };
+  const partes = texto.split(SEPARADOR);
+  const col = partes[1]?.startsWith("Col. ") ? partes[1].slice(5) : null;
+  const cp = partes[2]?.match(/^C\.P\. (\d{5})$/)?.[1] ?? null;
+  const lugar = partes[3]?.match(/^(.*), ([^,]+)$/);
+  if (col === null || cp === null || !lugar) return { ...DIRECCION_VACIA, calle: texto };
+  return {
+    calle: partes[0]!,
+    colonia: col,
+    cp,
+    municipio: lugar[1]!,
+    estado: lugar[2]!,
+    referencias: partes[4]?.startsWith("Ref. ") ? partes[4].slice(5) : "",
+  };
+}
+
+// ------------------------------------------------------------------
+// Registro
+// ------------------------------------------------------------------
+
+/** Lo que llena el cliente; la dirección se compone antes de enviarse. */
+export type FormularioRegistro = Omit<DatosDeRegistro, "direccion"> & {
+  direccion: Direccion;
+  aceptaTerminos: boolean;
+};
+
+export function validarRegistro(d: FormularioRegistro): ProblemaDeCampo[] {
   const p: ProblemaDeCampo[] = [];
   if (d.nombre.trim().length < 3) p.push({ campo: "nombre", mensaje: "Escribe tu nombre completo." });
   if (!normalizarTelefono(d.telefono)) p.push({ campo: "telefono", mensaje: "Tu WhatsApp a 10 dígitos." });
@@ -32,15 +125,41 @@ export function validarRegistro(d: DatosDeRegistro): ProblemaDeCampo[] {
     p.push({ campo: "contrasena", mensaje: "Combina letras y números." });
   }
   if (!d.ciudad) p.push({ campo: "ciudad", mensaje: "Elige tu ciudad." });
-  if (d.direccion.trim().length > 200) p.push({ campo: "direccion", mensaje: "La dirección es demasiado larga." });
+  if (requiereDireccion(d.ciudad)) p.push(...validarDireccion(d.direccion));
+  if (!d.aceptaTerminos) p.push({ campo: "terminos", mensaje: "Acepta los términos para crear tu cuenta." });
   return p;
 }
 
-export function validarPerfil(p: { nombre: string; telefono: string }): ProblemaDeCampo[] {
+export interface FormularioPerfil {
+  nombre: string;
+  telefono: string;
+  ciudad: string;
+  direccion: Direccion;
+  canalId: number | null;
+}
+
+export function validarPerfil(p: Pick<FormularioPerfil, "nombre" | "telefono"> & Partial<FormularioPerfil>): ProblemaDeCampo[] {
   const r: ProblemaDeCampo[] = [];
   if (p.nombre.trim().length < 3) r.push({ campo: "nombre", mensaje: "Escribe tu nombre completo." });
   if (!normalizarTelefono(p.telefono)) r.push({ campo: "telefono", mensaje: "Tu WhatsApp a 10 dígitos." });
+  if (p.direccion && requiereDireccion(p.ciudad ?? null)) r.push(...validarDireccion(p.direccion));
   return r;
+}
+
+// ------------------------------------------------------------------
+// 10 % de bienvenida. El cobro real lo decide la base (redondea a
+// decenas igual que aquí y nunca baja del costo); esto es para mostrar.
+// ------------------------------------------------------------------
+
+export function precioConBienvenida(precio: number, porcentaje = DESCUENTO_BIENVENIDA): number {
+  return Math.round((precio * (1 - porcentaje)) / 10) * 10;
+}
+
+/** "Jorge Duarte López" → "Jorge"; sin nombre, la parte del correo antes de la @. */
+export function primerNombre(nombre: string | null | undefined, correo = ""): string {
+  const n = (nombre ?? "").trim().split(/\s+/)[0];
+  if (n && n.length > 1) return n.length > 14 ? `${n.slice(0, 13)}…` : n;
+  return correo.split("@")[0] || "";
 }
 
 // ------------------------------------------------------------------
@@ -50,7 +169,7 @@ export function validarPerfil(p: { nombre: string; telefono: string }): Problema
 export const ETAPAS = ["consultado", "apartado", "comprado", "entregado"] as const;
 
 export const ESTADO_CLIENTE: Record<string, { titulo: string; texto: string }> = {
-  consultado: { titulo: "Solicitado", texto: "Recibimos tu solicitud. Te escribimos por WhatsApp para confirmar existencia y anticipo." },
+  consultado: { titulo: "Solicitado", texto: "Recibimos tu solicitud. Te escribimos por WhatsApp para acordar la compra." },
   apartado: { titulo: "Apartado", texto: "Recibimos tu anticipo. Estamos comprando tu perfume." },
   comprado: { titulo: "En camino", texto: "Ya lo tenemos. Coordinamos contigo la entrega." },
   entregado: { titulo: "Entregado", texto: "¡Gracias por tu compra! Que lo disfrutes." },
@@ -90,7 +209,8 @@ export function pedidosActivos(lista: PedidoPropio[]): number {
 
 type Repo = Pick<
   RepositorioCuenta,
-  | "correoActual"
+  | "sesionActual"
+  | "descuentoBienvenida"
   | "registrar"
   | "entrar"
   | "salir"
@@ -103,28 +223,32 @@ type Repo = Pick<
   | "misPedidos"
   | "solicitar"
   | "cancelar"
+  | "actualizarNombreDeSesion"
 >;
 
 export class ServicioCuenta {
   constructor(private readonly repo: Repo) {}
 
-  correoActual = () => this.repo.correoActual();
+  sesionActual = () => this.repo.sesionActual();
+  descuentoBienvenida = () => this.repo.descuentoBienvenida();
   perfil = () => this.repo.perfil();
   canales = () => this.repo.canales();
   misPedidos = () => this.repo.misPedidos();
   salir = () => this.repo.salir();
   alCambiar = (e: (x: EventoDeCuenta) => void) => this.repo.alCambiar(e);
 
-  async registrar(d: DatosDeRegistro, volverA: string) {
+  async registrar(d: FormularioRegistro, volverA: string) {
     const problemas = validarRegistro(d);
     if (problemas.length) throw new ErrorDeValidacion(problemas);
     return this.repo.registrar(
       {
-        ...d,
-        correo: d.correo.trim().toLowerCase(),
         nombre: d.nombre.trim().replace(/\s+/g, " "),
         telefono: normalizarTelefono(d.telefono)!,
-        direccion: d.direccion.trim(),
+        correo: d.correo.trim().toLowerCase(),
+        contrasena: d.contrasena,
+        ciudad: d.ciudad,
+        canal: d.canal,
+        direccion: requiereDireccion(d.ciudad) ? componerDireccion(d.direccion) : "",
       },
       volverA,
     );
@@ -152,23 +276,33 @@ export class ServicioCuenta {
     return this.repo.cambiarContrasena(nueva);
   }
 
-  async guardarPerfil(p: { nombre: string; telefono: string; direccion: string; ciudad: string; canalId: number | null }) {
+  async guardarPerfil(p: FormularioPerfil) {
     const problemas = validarPerfil(p);
     if (problemas.length) throw new ErrorDeValidacion(problemas);
-    return this.repo.guardarPerfil({
-      nombre: p.nombre.trim().replace(/\s+/g, " "),
+    const nombre = p.nombre.trim().replace(/\s+/g, " ");
+    await this.repo.guardarPerfil({
+      nombre,
       telefono: normalizarTelefono(p.telefono),
-      direccion: p.direccion.trim() || null,
+      direccion: requiereDireccion(p.ciudad) ? componerDireccion(p.direccion) : null,
       ciudad: p.ciudad || null,
       canalId: p.canalId,
     });
+    await this.repo.actualizarNombreDeSesion(nombre).catch(() => {});
+    return nombre;
   }
 
-  async apartar(presentacionId: number | null, ciudad: string | null, notas: string) {
+  /** Envío a otra ciudad exige dirección completa; en las tres ciudades no se pide. */
+  async apartar(presentacionId: number | null, ciudad: string | null, notas: string, direccion: Direccion | null = null) {
     if (presentacionId === null) {
       throw new ErrorDeDatos("regla", "Este perfume no se puede apartar en línea. Pídelo por WhatsApp.");
     }
-    return this.repo.solicitar(presentacionId, ciudad, notas.trim() || null);
+    let envio: string | null = null;
+    if (requiereDireccion(ciudad)) {
+      const problemas = validarDireccion(direccion ?? DIRECCION_VACIA);
+      if (problemas.length) throw new ErrorDeValidacion(problemas);
+      envio = componerDireccion(direccion!);
+    }
+    return this.repo.solicitar(presentacionId, ciudad, notas.trim() || null, envio);
   }
 
   cancelar(pedidoId: number) {

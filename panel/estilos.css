@@ -525,3 +525,7 @@ form.panel .campos-3 { margin-top: 0; }
   .avisos { right: 16px; bottom: 76px; }
   .acceso-tarjeta { padding: 32px 22px 26px; }
 }
+
+/* incremento 4.1: envío y bienvenida en la ficha del pedido */
+.dato-envio p{margin:0;padding:10px 12px;border-radius:10px;background:var(--crema);font-size:13.5px;line-height:1.5}
+.dato-descuento{margin:0 0 14px;padding:9px 12px;border-radius:10px;background:#e5efe0;color:#3f5732;font-size:13px}

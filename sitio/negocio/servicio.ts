@@ -5,7 +5,7 @@
  */
 import { CatalogoNoDisponible, FuenteCatalogo, type ResultadoCatalogo } from "../datos/fuente-catalogo";
 import { RepositorioCuenta } from "../datos/repositorio-cuenta";
-import { haySesionOEnlace } from "../datos/supabase";
+import { enlaceDeCorreo, haySesionOEnlace, type EnlaceDeCorreo } from "../datos/supabase";
 import { ServicioCuenta } from "./cuenta";
 
 export { CatalogoNoDisponible };
@@ -21,3 +21,7 @@ export const cuenta = new ServicioCuenta(new RepositorioCuenta());
 
 /** ¿Hay que preparar la cuenta desde que abre la página? */
 export const conviene = { cargarCuentaAlInicio: haySesionOEnlace };
+
+/** De qué enlace de correo venimos al abrir la página (o null). */
+export const enlaceAlAbrir: EnlaceDeCorreo | null = enlaceDeCorreo;
+export type { EnlaceDeCorreo };

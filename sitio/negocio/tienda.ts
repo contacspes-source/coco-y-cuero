@@ -7,9 +7,12 @@
 export const CIUDADES = ["Guadalajara", "Zamora", "Morelia"] as const;
 export const OTRA_CIUDAD = "Otra ciudad (envío)";
 
+/** 10 % en la primera compra con cuenta. Debe coincidir con privado.porcentaje_bienvenida() en la base. */
+export const DESCUENTO_BIENVENIDA = 0.1;
+
 export const PASOS_DE_COMPRA = [
-  { titulo: "Apártalo", texto: "Con tu cuenta o por WhatsApp. Te confirmamos existencia y fecha de entrega." },
-  { titulo: "Anticipo", texto: "Con tu anticipo hacemos la compra a nuestro proveedor." },
+  { titulo: "Apártalo", texto: "Con tu cuenta o por WhatsApp. Te confirmamos disponibilidad y fecha de entrega." },
+  { titulo: "Acordamos la compra", texto: "Definimos contigo anticipo, forma de pago y entrega." },
   { titulo: "Recíbelo", texto: "Liquidas el resto al recibirlo, revisado y sellado." },
 ] as const;
 
@@ -22,7 +25,7 @@ export const FORMAS_DE_PAGO = [
 export const FORMAS_DE_ENTREGA = [
   { titulo: "Punto de recolecta", texto: "En Guadalajara, Zamora y Morelia. Sin costo." },
   { titulo: "A domicilio", texto: "Dentro de esas tres ciudades. Pregunta disponibilidad por zona." },
-  { titulo: "Envío nacional", texto: "Por paquetería a todo México. El costo depende del destino." },
+  { titulo: "Envío a la república", texto: "Por paquetería a tu domicilio. El costo depende del destino." },
 ] as const;
 
 export const GARANTIA =

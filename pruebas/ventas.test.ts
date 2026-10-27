@@ -22,9 +22,11 @@ function pedido(p: Partial<PedidoAdmin> & { id: number }): PedidoAdmin {
   return {
     estado: "consultado",
     precioPactado: 1000,
+    descuento: 0,
     anticipo: 0,
     saldo: 1000,
     ciudadEntrega: "Zamora",
+    direccionEnvio: null,
     notas: null,
     notaInterna: null,
     creadoEn: "2026-10-20T10:00:00Z",

@@ -28,7 +28,7 @@ import {
 import { cargarCatalogo, conviene } from "../negocio/servicio";
 import { CONFIG, linkWhatsApp } from "./config";
 import { iconoFamilia, iconoWhatsApp } from "./iconos";
-import { abrirApartar, iniciarCuenta } from "./cuenta";
+import { abrirApartar, abrirRegistro, estadoBienvenida, iniciarCuenta } from "./cuenta";
 import { vistaDetalle } from "./detalle";
 import { abrirHoja, cerrarHoja, hojaAbierta } from "./hoja";
 
@@ -76,6 +76,8 @@ function abrirDetalle(p: PerfumePublico, empujar = true) {
       apartar: (perfume, presentacion) => void abrirApartar(perfume, presentacion, () => abrirDetalle(perfume, false)),
       abrirOtro: (otro) => abrirDetalle(otro),
       enlace: enlaceCompleto,
+      bienvenida: estadoBienvenida,
+      crearCuenta: () => void abrirRegistro(() => abrirDetalle(p, false)),
     }),
   );
 }
@@ -286,7 +288,7 @@ cargarCatalogo()
     if (p) abrirDetalle(p, false);
     if (origen === "respaldo") {
       rejilla.before(
-        h("p", { clase: "aviso-respaldo" }, "Mostramos el catálogo guardado mientras se restablece la conexión. Confirma precio y existencia por WhatsApp."),
+        h("p", { clase: "aviso-respaldo" }, "Mostramos el catálogo guardado mientras se restablece la conexión. Confirma precio y disponibilidad por WhatsApp."),
       );
     }
   })
@@ -300,4 +302,4 @@ cargarCatalogo()
   });
 
 // ------------------------------------------------------------ cuenta
-void iniciarCuenta($<HTMLButtonElement>("cuenta-boton"), conviene.cargarCuentaAlInicio(), () => {});
+void iniciarCuenta($<HTMLButtonElement>("cuenta-boton"), document.getElementById("promo"), conviene.cargarCuentaAlInicio(), () => {});

@@ -11,6 +11,13 @@ export default defineConfig({
     outDir: fileURLToPath(new URL("../dist", import.meta.url)),
     emptyOutDir: true,
     target: "es2022",
+    // dos páginas: la tienda y los términos de compra
+    rollupOptions: {
+      input: {
+        tienda: fileURLToPath(new URL("index.html", import.meta.url)),
+        terminos: fileURLToPath(new URL("terminos.html", import.meta.url)),
+      },
+    },
   },
   server: { port: 5174 },
 });
