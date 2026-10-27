@@ -13,6 +13,7 @@ import type {
   PedidoAdmin,
   Perfume,
   PerfumeEditable,
+  Reporte,
   Rol,
   Usuario,
 } from "../../compartido/tipos";
@@ -52,4 +53,11 @@ export interface RepositorioVentas {
   crearPedido(p: NuevoPedido): Promise<number>;
   actualizarPedido(id: number, cambios: CambiosDePedido): Promise<void>;
   guardarNotaInterna(pedidoId: number, nota: string | null): Promise<void>;
+  /** null borra el costo registrado. */
+  guardarCostoReal(pedidoId: number, costo: number | null): Promise<void>;
+}
+
+export interface RepositorioReportes {
+  /** Fechas "AAAA-MM-DD", hora de México. Solo admin. */
+  reporte(desde: string, hasta: string): Promise<Reporte>;
 }

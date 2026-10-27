@@ -529,3 +529,112 @@ form.panel .campos-3 { margin-top: 0; }
 /* incremento 4.1: envío y bienvenida en la ficha del pedido */
 .dato-envio p{margin:0;padding:10px 12px;border-radius:10px;background:var(--crema);font-size:13.5px;line-height:1.5}
 .dato-descuento{margin:0 0 14px;padding:9px 12px;border-radius:10px;background:#e5efe0;color:#3f5732;font-size:13px}
+
+/* ===========================================================
+   Reportes (incremento 5)
+   Una sola serie: cuero claro (#a0602f) validado contra el papel.
+   Meses fuera del periodo en un tono apagado de la misma familia.
+   =========================================================== */
+:root {
+  --dato: #a0602f;
+  --dato-apagado: #e3cdb8;
+  --dato-fondo: #f3e9de;
+  --sube: #4f6b3f;
+  --baja: #a2462b;
+}
+.reporte { display: flex; flex-direction: column; gap: 16px; }
+.reporte-controles { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; margin-bottom: 20px; }
+.pestanas-periodo { margin: 0; }
+.rango-personalizado { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
+.rango-personalizado .campo { width: 160px; }
+.rango-personalizado input { min-height: 38px; }
+
+.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.kpi { padding: 16px 18px; background: var(--papel); border: 1px solid var(--linea); border-radius: var(--radio); min-width: 0; }
+.kpi-valor { margin: 6px 0 4px; font-family: var(--display); font-size: 38px; font-weight: 500; line-height: 1.05; font-variant-numeric: lining-nums; overflow-wrap: anywhere; }
+.kpi-delta { margin: 0 0 2px; font-size: 12.5px; font-weight: 500; }
+.kpi-delta.sube { color: var(--sube); }
+.kpi-delta.baja { color: var(--baja); }
+.kpi-delta.neutro { color: var(--tinta-tenue); font-weight: 400; }
+
+.aviso-reporte { margin: 0; padding: 11px 14px; border-radius: var(--radio-chico); background: var(--justo-fondo); color: var(--justo); font-size: 13.5px; }
+.aviso-reporte.aviso-suave { background: var(--arena); color: var(--tinta-suave); }
+.reporte-vacio { margin: 6px 0 0; color: var(--tinta-tenue); font-size: 14px; }
+
+.reporte-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.reporte-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.reporte .panel { min-width: 0; }
+.reporte .panel > h2 { margin-bottom: 2px; }
+.reporte .panel-ayuda { margin: 2px 0 14px; }
+.reporte-3 .panel > h2 { margin-bottom: 12px; }
+
+/* gráfica */
+.grafica { position: relative; width: 100%; min-height: 230px; }
+.grafica-svg { display: block; font-family: var(--util); }
+.eje-guia { stroke: var(--linea); stroke-width: 1; }
+.eje-base { stroke: var(--linea-fuerte); stroke-width: 1; }
+.eje-texto { fill: var(--tinta-tenue); font-size: 11px; font-variant-numeric: tabular-nums; }
+.col-zona { fill: transparent; cursor: default; outline: none; }
+.col.activa .col-zona, .col-zona:focus-visible { fill: var(--dato-fondo); }
+.col-zona:focus-visible { stroke: var(--cuero); stroke-width: 1.5; }
+.col-barra { fill: var(--dato-apagado); pointer-events: none; }
+.col.en-periodo .col-barra { fill: var(--dato); }
+.col-valor { fill: var(--tinta); font-size: 12px; font-weight: 500; pointer-events: none; }
+.col text { pointer-events: none; }
+.grafica-globo {
+  position: absolute; left: var(--x, 0); top: var(--y, 0); transform: translate(-50%, -100%);
+  display: flex; flex-direction: column; gap: 1px; min-width: 150px; padding: 9px 12px;
+  background: var(--ebano); color: var(--crema); border-radius: 10px; font-size: 12.5px;
+  box-shadow: 0 8px 24px rgba(46, 31, 22, 0.22); pointer-events: none; white-space: nowrap;
+}
+.grafica-globo strong { font-weight: 500; text-transform: capitalize; margin-bottom: 2px; }
+
+/* tablas */
+.tabla-reporte { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.tabla-reporte th { padding: 0 8px 8px; font-size: 11.5px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--tinta-tenue); text-align: left; border-bottom: 1px solid var(--linea); }
+.tabla-reporte td { padding: 9px 8px; border-bottom: 1px solid var(--linea); vertical-align: top; }
+.tabla-reporte tr:last-child td { border-bottom: 0; }
+.tabla-reporte th:first-child, .tabla-reporte td:first-child { padding-left: 0; }
+.tabla-reporte th:last-child, .tabla-reporte td:last-child { padding-right: 0; }
+.tabla-reporte .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.celda-nombre { width: 100%; }
+.celda-nombre > span { display: block; }
+.celda-marca { display: block; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--tinta-tenue); }
+.barrita { display: block; width: 100%; max-width: 220px; height: 4px; margin-top: 6px; }
+.barrita-fondo { fill: var(--dato-fondo); }
+.barrita-valor { fill: var(--dato); }
+.tabla-meses td:first-child { text-transform: capitalize; }
+
+/* embudo y hoy */
+.embudo { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.embudo li { display: grid; grid-template-columns: 64px 1fr; column-gap: 12px; align-items: baseline; padding-bottom: 10px; border-bottom: 1px solid var(--linea); }
+.embudo li:last-child { border-bottom: 0; padding-bottom: 0; }
+.embudo-n { grid-row: span 2; font-family: var(--display); font-size: 30px; font-weight: 500; line-height: 1; font-variant-numeric: lining-nums; }
+.embudo-t { font-weight: 500; }
+.embudo-x { font-size: 12.5px; color: var(--tinta-tenue); }
+.hoy-cifras { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 0 0 16px; }
+.hoy-cifras div { padding: 12px 14px; border-radius: var(--radio-chico); background: var(--crema); }
+.hoy-cifras dt { font-size: 12px; color: var(--tinta-suave); }
+.hoy-cifras dd { margin: 2px 0 0; font-family: var(--display); font-size: 26px; font-weight: 500; font-variant-numeric: lining-nums; }
+
+.campo-saldo strong.negativa { color: var(--bajo); }
+
+@media (max-width: 1020px) {
+  .kpis { grid-template-columns: repeat(2, 1fr); }
+  .reporte-3 { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 680px) {
+  .reporte-2, .reporte-3 { grid-template-columns: 1fr; }
+  .kpis { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .kpi { padding: 13px 14px; }
+  .kpi-valor { font-size: 27px; }
+  .kpi-delta, .kpi .tarjeta-nota { font-size: 11.5px; }
+  .reporte-controles { flex-direction: column; align-items: stretch; }
+  .pestanas-periodo { flex-wrap: nowrap; overflow-x: auto; width: 100%; scrollbar-width: none; }
+  .pestanas-periodo::-webkit-scrollbar { display: none; }
+  .pestanas-periodo .pestana { flex: none; }
+  .rango-personalizado .campo { flex: 1 1 130px; width: auto; }
+  .reporte .panel { padding: 18px 16px 20px; }
+  .hoy-cifras { grid-template-columns: 1fr; }
+}
+.panel .fila-costo { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--linea); }

@@ -5,7 +5,7 @@
 -- Supabase y ejecútalo. Todo corre dentro de una transacción que
 -- termina en ROLLBACK, así que NO deja datos de prueba.
 --
--- Resultado esperado: las 56 filas con estado = 'OK'.
+-- Resultado esperado: las 66 filas con estado = 'OK'.
 -- Si alguna dice 'FALLA', no publiques el cambio que hiciste.
 --
 -- Córrelas cada vez que toques una política RLS, un GRANT o una
@@ -352,6 +352,59 @@ begin
   perform public.cancelar_mi_pedido(v);
   r := public.mi_descuento_bienvenida()::text;
   reset role; insert into _p values (58,'cancelar todo devuelve el 10 %','0.10',r);
+  -- ===== incremento 5 · reportes =====
+  -- Beto: un pedido que llega hasta entregado
+  perform set_config('request.jwt.claims','{"sub":"bbbbbbbb-0000-0000-0000-000000000002","role":"authenticated"}', true);
+  set local role authenticated;
+  v := public.solicitar_pedido(pres, 'Guadalajara');
+  reset role;
+  update public.pedido set estado = 'apartado', anticipo = 100 where id = v;
+  update public.pedido set estado = 'comprado' where id = v;
+  select (pc.costo = privado.costo_vigente(pres) and pc.origen = 'catalogo')::text into r
+    from public.pedido_costo pc where pc.pedido_id = v;
+  insert into _p values (59,'al comprar se guarda el costo', 'true', coalesce(r,'sin costo'));
+  update public.pedido_costo set costo = costo - 10, origen = 'manual' where pedido_id = v;
+  update public.pedido set estado = 'entregado' where id = v;
+  select (pc.origen)::text into r from public.pedido_costo pc where pc.pedido_id = v;
+  insert into _p values (60,'entregar no pisa el costo corregido', 'manual', r);
+
+  set local role authenticated;
+  select coalesce(costo_real::text, 'oculto') into r from public.pedido_detalle where id = v;
+  reset role; insert into _p values (61,'cliente no ve su costo en la vista','oculto',r); set local role authenticated;
+  select count(*) into i from public.pedido_costo;
+  reset role; insert into _p values (62,'cliente lee tabla de costos','0',i::text); set local role authenticated;
+  begin perform public.reporte_ventas(current_date - 30, current_date); r := 'VIO REPORTE';
+  exception when insufficient_privilege then r := 'bloqueado'; end;
+  reset role; insert into _p values (63,'cliente pide el reporte','bloqueado',r);
+
+  set local role anon;
+  begin perform public.reporte_ventas(current_date - 30, current_date); r := 'VIO REPORTE';
+  exception when insufficient_privilege then r := 'bloqueado'; end;
+  reset role; insert into _p values (64,'anon pide el reporte','bloqueado',r);
+
+  perform set_config('request.jwt.claims','{"sub":"cccccccc-0000-0000-0000-000000000003","role":"authenticated"}', true);
+  set local role authenticated;
+  select public.reporte_ventas(current_date - 6, current_date) into datos;
+  reset role;
+  select ((datos #>> '{resumen,ventas}')::int >= 1
+      and (datos #>> '{resumen,margen}')::numeric = (datos #>> '{resumen,ingresos}')::numeric - (datos #>> '{resumen,costo}')::numeric
+      and jsonb_array_length(datos -> 'por_mes') = 12
+      and (datos #>> '{embudo,creados}')::int >= (datos #>> '{embudo,entregado}')::int)::text into r;
+  insert into _p values (65,'admin ve un reporte cuadrado','true',r);
+  select exists (
+    select 1 from jsonb_array_elements(datos -> 'top_perfumes') t
+    where (t ->> 'perfume_id')::bigint = (select perfume_id from public.presentacion where id = pres))::text into r;
+  insert into _p values (66,'lo vendido aparece en más vendidos','true',r);
+
+  perform set_config('request.jwt.claims','{"sub":"cccccccc-0000-0000-0000-000000000003","role":"authenticated"}', true);
+  set local role authenticated;
+  begin perform public.reporte_ventas(current_date, current_date - 1); r := 'ACEPTO';
+  exception when invalid_parameter_value then r := 'rechazado'; end;
+  reset role; insert into _p values (67,'rango al revés','rechazado',r);
+
+  select (has_table_privilege('anon','public.perfume','TRUNCATE')
+       or has_table_privilege('authenticated','public.pedido','TRUNCATE'))::text into r;
+  insert into _p values (68,'nadie de fuera puede vaciar tablas','false',r);
 end $$;
 
 select n, prueba, esperado, obtenido,

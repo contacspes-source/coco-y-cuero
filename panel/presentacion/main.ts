@@ -13,6 +13,7 @@ import { vistaFormulario } from "./vistas/formulario";
 import { vistaPrecios } from "./vistas/precios";
 import { vistaCliente, vistaClientes } from "./vistas/clientes";
 import { vistaNuevoPedido, vistaPedido, vistaPedidos } from "./vistas/pedidos";
+import { vistaReportes } from "./vistas/reportes";
 
 const raiz = document.getElementById("app")!;
 
@@ -77,6 +78,7 @@ function pintarMarco() {
         enlace("#/clientes", "Clientes"),
         enlace("#/", "Catálogo"),
         enlace("#/precios", "Precios"),
+        enlace("#/reportes", "Reportes"),
       ),
       h(
         "div",
@@ -120,7 +122,7 @@ function enrutar(forzar = false) {
 
   document.querySelectorAll<HTMLElement>(".navegacion a").forEach((a) => {
     const r = a.dataset.ruta!;
-    const seccion = /^#\/(pedidos|clientes|precios)/.exec(ruta)?.[0] ?? "#/";
+    const seccion = /^#\/(pedidos|clientes|precios|reportes)/.exec(ruta)?.[0] ?? "#/";
     a.classList.toggle("activo", r === seccion);
   });
 
@@ -151,6 +153,9 @@ function pintarRuta(ruta: string) {
   if (perfume) {
     vista = vistaFormulario(perfume[1]!, navegar, sesionVencida);
     titulo = "Perfume";
+  } else if (ruta === "#/reportes") {
+    vista = vistaReportes(sesionVencida);
+    titulo = "Reportes";
   } else if (ruta === "#/precios") {
     vista = vistaPrecios(sesionVencida);
     titulo = "Precios";

@@ -49,7 +49,7 @@ Requiere Node.js 22 o más nuevo.
 npm install          # una sola vez
 npm run dev          # sitio en http://localhost:5174/
 npm run dev:panel    # panel en http://localhost:5173/panel/
-npm test             # 200 pruebas
+npm test             # 239 pruebas
 npm run build        # revisa tipos, compila y arma dist/
 ```
 
@@ -60,8 +60,8 @@ npm run build        # revisa tipos, compila y arma dist/
 ## Calidad
 
 - **TypeScript estricto**: errores de tipos frenan la compilación.
-- **200 pruebas automáticas**: motor de precios, validación, filtros, ajuste masivo, catálogo con la base caída, estados de pedido, registro de clientes, detalle del perfume, casos de uso con repositorios falsos y regla de capas.
-- **56 pruebas de seguridad en la base** (`supabase/pruebas/seguridad.sql`).
+- **239 pruebas automáticas**: motor de precios, validación, filtros, ajuste masivo, catálogo con la base caída, estados de pedido, registro de clientes, detalle del perfume, periodos y CSV de reportes, casos de uso con repositorios falsos y regla de capas.
+- **66 pruebas de seguridad en la base** (`supabase/pruebas/seguridad.sql`).
 - **GitHub Actions** corre todo en cada push; si algo falla, el commit sale en rojo.
 
 ## Agregar o cambiar perfumes
@@ -93,6 +93,19 @@ Tú lo registras en el panel ─┘        (anticipo)   (ya lo tienes)  (saldo c
 - **Panel → Pedidos**: lo pendiente arriba (por confirmar, por comprar, por entregar, por cobrar). Cada pedido trae un mensaje de WhatsApp ya redactado según su estado.
 - **Panel → Clientes**: número de cliente, cómo te conocieron (útil para saber qué anuncio funciona), pedidos y total comprado.
 - **Mi cuenta (sitio)**: el cliente ve su número, sus pedidos con fechas y puede cancelar una solicitud mientras no la hayas apartado.
+
+## Reportes (Panel → Reportes)
+
+| Qué ves | De dónde sale |
+| --- | --- |
+| Ventas, ganancia, ticket promedio | Pedidos **entregados** en el periodo (cuenta el día en que lo marcaste entregado) |
+| Comparación ▲▼ | El periodo anterior del mismo largo (p. ej. del 1 al 26 de octubre se compara con los 26 días anteriores) |
+| Ganancia | Precio pactado menos el **costo real** del pedido. Se toma solo del catálogo al marcar "Comprado"; corrígelo en la ficha si pagaste otra cantidad |
+| Cómo te conocen | El "¿Cómo nos conociste?" de cada cliente nuevo y lo que compraron |
+| Pedidos que entraron | Los creados en el periodo y en qué estado están hoy |
+| Hoy | Pedidos en curso, anticipos, lo que falta cobrar y lo invertido en perfumes ya comprados |
+
+"Descargar CSV" baja todo el reporte para abrirlo en Excel o Google Sheets.
 
 ## Textos que puedes cambiar sin tocar la lógica
 

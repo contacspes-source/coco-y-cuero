@@ -13,6 +13,7 @@ import {
   siguienteEstado,
   transicionesDe,
   type VistaPedidos,
+  gananciaDe,
 } from "../../negocio/ventas";
 import { estado, recargar, recargarVentas, servicios } from "../estado";
 import { avisar, campo, iconoWhatsApp, confirmar, conBotonOcupado, fmtPesos, h, marcarErrores, selector, vaciar } from "../ui";
@@ -212,8 +213,24 @@ export function vistaPedido(id: number, navegar: (r: string) => void, alSesionVe
   const notas = h("textarea", { rows: 2, maxlength: 500 }, p.notas ?? "");
   const notaInterna = h("textarea", { rows: 3, maxlength: 1000, placeholder: "Solo la ves tú: proveedor, acuerdos, recordatorios…" }, p.notaInterna ?? "");
   const saldo = h("strong", null, fmtPesos(p.saldo));
+  const costo = h("input", {
+    type: "number",
+    min: 0,
+    step: 10,
+    value: p.costoReal ?? "",
+    placeholder: p.estado === "consultado" || p.estado === "apartado" ? "Se llena al marcar comprado" : "",
+    disabled: p.estado === "cancelado",
+  });
+  const ganancia = h("strong", null, fmtPesos(gananciaDe(p)));
+  const actualizarGanancia = () => {
+    const c = num(costo.value);
+    ganancia.textContent = Number.isFinite(c) ? fmtPesos((num(precio.value) || 0) - c) : "—";
+    ganancia.classList.toggle("negativa", Number.isFinite(c) && (num(precio.value) || 0) - c < 0);
+  };
+  costo.addEventListener("input", actualizarGanancia);
   const actualizarSaldo = () => { saldo.textContent = fmtPesos((num(precio.value) || 0) - (num(anticipo.value) || 0)); };
   precio.addEventListener("input", actualizarSaldo);
+  precio.addEventListener("input", actualizarGanancia);
   anticipo.addEventListener("input", actualizarSaldo);
 
   const botonGuardar = h("button", { clase: "boton boton-primario", type: "submit" }, "Guardar cambios");
@@ -237,6 +254,7 @@ export function vistaPedido(id: number, navegar: (r: string) => void, alSesionVe
           try {
             await conBotonOcupado(botonGuardar, "Guardando…", async () => {
               await servicios.ventas.guardarCambios(p, cambios, notaInterna.value.trim() || null);
+              if (p.estado !== "cancelado") await servicios.ventas.guardarCostoReal(p, costo.value);
               await recargarVentas();
             });
             avisar("Pedido actualizado.", "exito");
@@ -259,6 +277,21 @@ export function vistaPedido(id: number, navegar: (r: string) => void, alSesionVe
         ayuda: cerrado ? undefined : `Sugerido: ${fmtPesos(anticipoSugerido(p.precioPactado))}`,
       }),
       h("div", { clase: "campo campo-saldo" }, h("label", null, "Saldo"), saldo),
+    ),
+    h(
+      "div",
+      { clase: "campos-3 fila-costo" },
+      campo("Costo real", costo, {
+        nombre: "costo",
+        ayuda:
+          p.costoOrigen === "catalogo"
+            ? "Tomado del catálogo al comprarlo. Corrígelo si pagaste otra cantidad."
+            : p.costoOrigen === "manual"
+              ? "Capturado por ti. Solo tú lo ves."
+              : "Lo que pagaste por el perfume. Solo tú lo ves.",
+      }),
+      h("div", { clase: "campo campo-saldo" }, h("label", null, "Ganancia"), ganancia),
+      h("div"),
     ),
     h(
       "div",

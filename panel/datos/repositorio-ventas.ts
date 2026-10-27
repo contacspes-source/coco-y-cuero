@@ -29,6 +29,8 @@ function aPedido(f: Record<string, unknown>): PedidoAdmin {
     saldo: num(f.saldo),
     ciudadEntrega: texto(f.ciudad_entrega),
     direccionEnvio: texto(f.direccion_envio),
+    costoReal: f.costo_real === null || f.costo_real === undefined ? null : num(f.costo_real),
+    costoOrigen: (f.costo_origen as "catalogo" | "manual" | null | undefined) ?? null,
     notas: texto(f.notas),
     notaInterna: texto(f.nota_interna),
     creadoEn: String(f.creado_en),
@@ -128,6 +130,15 @@ export class RepositorioVentasSupabase implements RepositorioVentas {
     const r = nota?.trim()
       ? await tabla.upsert({ pedido_id: pedidoId, nota: nota.trim(), actualizado_en: new Date().toISOString() })
       : await tabla.delete().eq("pedido_id", pedidoId);
+    revisar(r);
+  }
+
+  async guardarCostoReal(pedidoId: number, costo: number | null): Promise<void> {
+    const tabla = supabase().from("pedido_costo");
+    const r =
+      costo === null
+        ? await tabla.delete().eq("pedido_id", pedidoId)
+        : await tabla.upsert({ pedido_id: pedidoId, costo, origen: "manual", actualizado_en: new Date().toISOString() });
     revisar(r);
   }
 }

@@ -171,6 +171,18 @@ export function filtrarClientes(lista: ClienteAdmin[], texto: string): ClienteAd
 // Casos de uso
 // ------------------------------------------------------------------
 
+export function validarCostoReal(costo: number | null, precio: number): ProblemaDeCampo[] {
+  if (costo === null) return [];
+  if (!Number.isFinite(costo) || costo < 0) return [{ campo: "costo", mensaje: "Escribe lo que pagaste, en pesos." }];
+  if (costo > precio * 3 && precio > 0) return [{ campo: "costo", mensaje: "Revisa el costo: es más del triple del precio." }];
+  return [];
+}
+
+/** Ganancia de un pedido: precio menos costo real. null si aún no hay costo. */
+export function gananciaDe(p: Pick<PedidoAdmin, "precioPactado" | "costoReal">): number | null {
+  return p.costoReal === null ? null : p.precioPactado - p.costoReal;
+}
+
 export class ServicioVentas {
   constructor(private readonly repo: RepositorioVentas) {}
 
@@ -203,6 +215,19 @@ export class ServicioVentas {
     if (notaInterna !== undefined && (notaInterna ?? "") !== (p.notaInterna ?? "")) {
       await this.repo.guardarNotaInterna(p.id, notaInterna);
     }
+  }
+
+  /**
+   * Lo que realmente pagaste por el perfume. Texto vacío = borrar (vuelve
+   * a usarse el costo de catálogo en los reportes).
+   */
+  async guardarCostoReal(p: PedidoAdmin, texto: string): Promise<void> {
+    const limpio = texto.trim();
+    const costo = limpio === "" ? null : Number(limpio);
+    const problemas = validarCostoReal(costo, p.precioPactado);
+    if (problemas.length) throw new ErrorDeValidacion(problemas);
+    if (costo === p.costoReal) return;
+    await this.repo.guardarCostoReal(p.id, costo);
   }
 
   async cambiarEstado(p: PedidoAdmin, a: EstadoPedido): Promise<void> {

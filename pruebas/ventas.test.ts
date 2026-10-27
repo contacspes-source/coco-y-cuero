@@ -16,6 +16,7 @@ import {
   transicionesDe,
   validarCliente,
   validarNuevoPedido,
+  gananciaDe,
 } from "../panel/negocio/ventas";
 
 function pedido(p: Partial<PedidoAdmin> & { id: number }): PedidoAdmin {
@@ -27,6 +28,8 @@ function pedido(p: Partial<PedidoAdmin> & { id: number }): PedidoAdmin {
     saldo: 1000,
     ciudadEntrega: "Zamora",
     direccionEnvio: null,
+    costoReal: null,
+    costoOrigen: null,
     notas: null,
     notaInterna: null,
     creadoEn: "2026-10-20T10:00:00Z",
@@ -180,7 +183,32 @@ describe("ServicioVentas", () => {
     async crearPedido(p: NuevoPedido) { this.creados.push(p); return 1; }
     async actualizarPedido(id: number, c: CambiosDePedido) { this.cambios.push([id, c]); }
     async guardarNotaInterna(id: number, n: string | null) { this.notas.push([id, n]); }
+    costos: [number, number | null][] = [];
+    async guardarCostoReal(id: number, c: number | null) { this.costos.push([id, c]); }
   }
+
+  test("costo real: se guarda, se borra con vacío y no se repite si no cambió", async () => {
+    const repo = new Falso();
+    const s = new ServicioVentas(repo);
+    await s.guardarCostoReal(pedido({ id: 4, precioPactado: 1300 }), " 690 ");
+    await s.guardarCostoReal(pedido({ id: 4, precioPactado: 1300, costoReal: 690 }), "690");
+    await s.guardarCostoReal(pedido({ id: 4, precioPactado: 1300, costoReal: 690 }), "");
+    expect(repo.costos).toEqual([[4, 690], [4, null]]);
+  });
+
+  test("costo real inválido no llega a la base", async () => {
+    const repo = new Falso();
+    const s = new ServicioVentas(repo);
+    await expect(s.guardarCostoReal(pedido({ id: 5 }), "-5")).rejects.toBeInstanceOf(ErrorDeValidacion);
+    await expect(s.guardarCostoReal(pedido({ id: 5 }), "abc")).rejects.toBeInstanceOf(ErrorDeValidacion);
+    await expect(s.guardarCostoReal(pedido({ id: 5, precioPactado: 1000 }), "9000")).rejects.toBeInstanceOf(ErrorDeValidacion);
+    expect(repo.costos).toEqual([]);
+  });
+
+  test("ganancia del pedido", () => {
+    expect(gananciaDe(pedido({ id: 6, precioPactado: 1310, costoReal: 690 }))).toBe(620);
+    expect(gananciaDe(pedido({ id: 6 }))).toBeNull();
+  });
 
   test("no deja saltarse estados", async () => {
     const repo = new Falso();

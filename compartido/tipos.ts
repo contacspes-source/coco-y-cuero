@@ -150,6 +150,10 @@ export interface PedidoAdmin {
   ciudadEntrega: string | null;
   /** Solo en envíos por paquetería a otra ciudad. */
   direccionEnvio: string | null;
+  /** Lo que realmente pagaste por él (solo admin). null = aún no se compra. */
+  costoReal: number | null;
+  /** "catalogo" = se tomó solo al marcar comprado; "manual" = lo corregiste tú. */
+  costoOrigen: "catalogo" | "manual" | null;
   notas: string | null;
   notaInterna: string | null;
   creadoEn: string;
@@ -183,4 +187,44 @@ export interface CambiosDePedido {
   precioPactado?: number;
   ciudadEntrega?: string | null;
   notas?: string | null;
+}
+
+// ------------------------------------------------------------------
+// Reportes (incremento 5). Lo calcula la base en reporte_ventas().
+// ------------------------------------------------------------------
+
+export interface ResumenVentas {
+  /** pedidos entregados en el periodo */
+  ventas: number;
+  ingresos: number;
+  costo: number;
+  margen: number;
+  descuentos: number;
+  /** cuántas ventas usan costo de catálogo por no tener costo real */
+  costoEstimado: number;
+}
+
+export interface FilaReporte {
+  nombre: string;
+  ventas: number;
+  ingresos: number;
+  margen: number | null;
+}
+
+export interface Reporte {
+  desde: string;
+  hasta: string;
+  resumen: ResumenVentas;
+  /** el periodo anterior del mismo largo, para comparar */
+  anterior: ResumenVentas;
+  porMes: { mes: string; ventas: number; ingresos: number; margen: number }[];
+  topPerfumes: (FilaReporte & { perfumeId: number; marca: string })[];
+  porCategoria: FilaReporte[];
+  porGenero: FilaReporte[];
+  porCiudad: FilaReporte[];
+  porCanal: { nombre: string; clientesNuevos: number; ventas: number; ingresos: number }[];
+  clientes: { nuevos: number; compradores: number; recurrentes: number };
+  embudo: { creados: number; consultado: number; apartado: number; comprado: number; entregado: number; cancelado: number };
+  /** foto de hoy, sin importar el periodo */
+  pendiente: { enCurso: number; porCobrar: number; anticipos: number; invertido: number };
 }
