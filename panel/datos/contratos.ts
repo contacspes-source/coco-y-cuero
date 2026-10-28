@@ -24,6 +24,8 @@ export interface RepositorioCatalogo {
   /** Guarda todo el perfume en una transacción. Devuelve su id. */
   guardarPerfume(datos: PerfumeEditable): Promise<number>;
   cambiarPublicado(perfumeId: number, publicado: boolean): Promise<void>;
+  /** Cambia solo la foto (para reencuadrar sin tocar lo demás). */
+  cambiarFoto(perfumeId: number, url: string): Promise<void>;
   /** Todos o ninguno. Devuelve cuántos precios cambiaron. */
   actualizarPrecios(cambios: CambioDePrecio[]): Promise<number>;
 }

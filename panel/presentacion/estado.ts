@@ -19,6 +19,10 @@ export const estado: {
   canales: { id: number; nombre: string }[];
   /** hay un formulario con cambios sin guardar */
   sucio: boolean;
+  /** dónde estabas en la lista del catálogo, para regresar ahí */
+  posicionCatalogo: number;
+  /** perfume a resaltar al volver a la lista (el que acabas de guardar) */
+  resaltar: number | null;
 } = {
   correo: null,
   catalogos: null,
@@ -28,6 +32,8 @@ export const estado: {
   pedidos: [],
   canales: [],
   sucio: false,
+  posicionCatalogo: 0,
+  resaltar: null,
 };
 
 export async function recargar(): Promise<void> {

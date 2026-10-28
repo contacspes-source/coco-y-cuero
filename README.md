@@ -49,7 +49,7 @@ Requiere Node.js 22 o más nuevo.
 npm install          # una sola vez
 npm run dev          # sitio en http://localhost:5174/
 npm run dev:panel    # panel en http://localhost:5173/panel/
-npm test             # 251 pruebas
+npm test             # 263 pruebas
 npm run build        # revisa tipos, compila y arma dist/
 ```
 
@@ -60,7 +60,7 @@ npm run build        # revisa tipos, compila y arma dist/
 ## Calidad
 
 - **TypeScript estricto**: errores de tipos frenan la compilación.
-- **251 pruebas automáticas**: motor de precios, validación, filtros, ajuste masivo, catálogo con la base caída, estados de pedido, registro de clientes, detalle del perfume, periodos y CSV de reportes, casos de uso con repositorios falsos y regla de capas.
+- **263 pruebas automáticas**: motor de precios, validación, filtros, ajuste masivo, catálogo con la base caída, estados de pedido, registro de clientes, detalle del perfume, periodos y CSV de reportes, casos de uso con repositorios falsos y regla de capas.
 - **66 pruebas de seguridad en la base** (`supabase/pruebas/seguridad.sql`).
 - **GitHub Actions** corre todo en cada push; si algo falla, el commit sale en rojo.
 

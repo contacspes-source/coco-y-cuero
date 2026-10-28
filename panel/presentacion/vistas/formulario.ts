@@ -95,11 +95,39 @@ export function vistaFormulario(
     "Quitar",
   );
 
+  const botonEncuadre = h(
+    "button",
+    { type: "button", clase: "enlace", title: "Centra el perfume con el mismo margen que las demás fotos", al: { click: () => void reencuadrar() } },
+    "Ajustar encuadre",
+  );
+
   function pintarFoto() {
     const src = urlDeFoto(actual.imagenUrl);
     vaciar(marcoFoto, src ? h("img", { src, alt: "Foto del perfume" }) : h("p", { clase: "foto-vacia" }, "Sin foto"));
     botonFoto.textContent = src ? "Cambiar foto" : "Subir foto";
     botonQuitarFoto.hidden = !src;
+    botonEncuadre.hidden = !src;
+  }
+
+  /** Vuelve a procesar la foto que ya tiene (para las que subiste antes del ajuste). */
+  async function reencuadrar() {
+    const src = urlDeFoto(actual.imagenUrl);
+    if (!src) return;
+    try {
+      const url = await conBotonOcupado(botonEncuadre, "Ajustando…", async () => {
+        const r = await fetch(src);
+        if (!r.ok) throw new ErrorDeFoto("No se pudo leer la foto actual. Súbela de nuevo.");
+        const lista = await prepararFoto(await r.blob());
+        return servicios.catalogo.subirFoto(lista, actual.marca || "perfume", actual.nombre);
+      });
+      actual.imagenUrl = url;
+      pintarFoto();
+      tocar();
+      avisar("Encuadre ajustado. Guarda para que se vea en el sitio.", "exito");
+    } catch (e) {
+      avisar(e instanceof ErrorDeFoto ? e.message : mensajeDe(e), "error");
+      if (esDeSesion(e)) alSesionVencida();
+    }
   }
 
   async function subirFoto() {
@@ -275,9 +303,10 @@ export function vistaFormulario(
         return id;
       });
       estado.sucio = false;
-      avisar(esNuevo ? `${actual.nombre} quedó dado de alta.` : "Cambios guardados.", "exito");
-      // se vuelve a pintar con lo que quedó en la base
-      navegar(`#/perfume/${id}`);
+      avisar(esNuevo ? `${actual.nombre} quedó dado de alta.` : `${actual.nombre}: cambios guardados.`, "exito");
+      // regresa a la lista, al mismo lugar, con el perfume resaltado
+      estado.resaltar = id;
+      navegar("#/");
     } catch (err) {
       if (err instanceof ErrorDeValidacion) {
         marcarErrores(formulario, err.problemas);
@@ -361,8 +390,8 @@ export function vistaFormulario(
           { clase: "panel" },
           h("h2", null, "Foto"),
           marcoFoto,
-          h("div", { clase: "foto-acciones" }, botonFoto, botonQuitarFoto, entradaFoto),
-          h("p", { clase: "panel-ayuda" }, "Se reduce y comprime sola. Ideal: fondo claro y el frasco completo."),
+          h("div", { clase: "foto-acciones" }, botonFoto, botonEncuadre, botonQuitarFoto, entradaFoto),
+          h("p", { clase: "panel-ayuda" }, "Se centra, se reduce y se comprime sola. Ideal: fondo blanco y el frasco completo, sin cortar."),
         ),
         h(
           "section",

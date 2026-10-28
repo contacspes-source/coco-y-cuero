@@ -638,3 +638,10 @@ form.panel .campos-3 { margin-top: 0; }
   .hoy-cifras { grid-template-columns: 1fr; }
 }
 .panel .fila-costo { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--linea); }
+
+/* el perfume que acabas de guardar, al volver a la lista */
+.renglon.recien-guardado { animation: resaltar 2.4s ease; }
+@keyframes resaltar {
+  0%, 30% { background: var(--justo-fondo); box-shadow: 0 0 0 2px var(--caramelo); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}

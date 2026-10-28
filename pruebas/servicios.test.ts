@@ -15,6 +15,8 @@ class CatalogoFalso implements RepositorioCatalogo {
   async listarPerfumes() { return [perfume({ id: 1 })]; }
   async guardarPerfume(d: PerfumeEditable) { this.guardados.push(d); return d.id ?? 99; }
   async cambiarPublicado(id: number, v: boolean) { this.publicados.push([id, v]); }
+  fotos: [number, string][] = [];
+  async cambiarFoto(id: number, url: string) { this.fotos.push([id, url]); }
   async actualizarPrecios(c: CambioDePrecio[]) { this.precios.push(c); return c.length; }
 }
 
@@ -53,6 +55,31 @@ describe("ServicioCatalogo", () => {
     expect(repo.guardados[0]?.nombre).toBe("Mi Perfume");
   });
 
+  test("ajustar fotos: solo las subidas al panel, y una mala no detiene a las demás", async () => {
+    const repo = new CatalogoFalso();
+    const fotos = new FotosFalsas();
+    const s = new ServicioCatalogo(repo, fotos, () => 1000);
+    const lista = [
+      perfume({ id: 1, nombre: "Asad", imagenUrl: "https://x.supabase.co/a.webp" }),
+      perfume({ id: 2, nombre: "Yara", imagenUrl: "assets/img/lattafa-yara.jpg" }),
+      perfume({ id: 3, nombre: "Rota", imagenUrl: "https://x.supabase.co/rota.webp" }),
+      perfume({ id: 4, nombre: "Sin foto", imagenUrl: null }),
+      perfume({ id: 5, nombre: "Ya ajustada", imagenUrl: "https://x.supabase.co/asad-abc-enc.webp" }),
+    ];
+    const avance: string[] = [];
+    const r = await s.ajustarFotos(
+      lista,
+      async (url) => {
+        if (url.includes("rota")) throw new Error("no se pudo leer");
+        return new Blob(["x"], { type: "image/webp" });
+      },
+      (h, t) => avance.push(`${h}/${t}`),
+    );
+    expect(r).toEqual({ ajustadas: 1, fallidas: ["Rota"] });
+    expect(repo.fotos.map(([id]) => id)).toEqual([1]);
+    expect(avance).toEqual(["0/2", "1/2", "2/2"]);
+  });
+
   test("baja y reactivación son lógicas, no borran", async () => {
     const repo = new CatalogoFalso();
     const s = new ServicioCatalogo(repo, new FotosFalsas());
@@ -79,7 +106,7 @@ describe("ServicioCatalogo", () => {
     const fotos = new FotosFalsas();
     const s = new ServicioCatalogo(new CatalogoFalso(), fotos, () => 1_700_000_000_000);
     const url = await s.subirFoto(new Blob(["x"], { type: "image/webp" }), "Lattafa", "Asad Bourbon");
-    expect(fotos.rutas[0]).toMatch(/^lattafa-asad-bourbon-[a-z0-9]+\.webp$/);
+    expect(fotos.rutas[0]).toMatch(/^lattafa-asad-bourbon-[a-z0-9]+-enc\.webp$/);
     expect(url).toContain("lattafa-asad-bourbon");
   });
 });

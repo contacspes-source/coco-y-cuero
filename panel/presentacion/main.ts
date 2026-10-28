@@ -118,6 +118,8 @@ function enrutar(forzar = false) {
   if (!estado.correo) return;
   const ruta = location.hash || "#/";
   if (ruta === rutaActual && !forzar) return;
+  // al salir de la lista se guarda dónde ibas, para volver ahí
+  if (rutaActual === "#/" && ruta !== "#/") estado.posicionCatalogo = window.scrollY;
   rutaActual = ruta;
 
   document.querySelectorAll<HTMLElement>(".navegacion a").forEach((a) => {
@@ -179,7 +181,25 @@ function pintarRuta(ruta: string) {
   }
   document.title = `${titulo} · Panel Coco & Cuero`;
   vaciar(contenido, vista);
-  window.scrollTo({ top: 0 });
+  if (ruta === "#/") volverALaLista();
+  else window.scrollTo({ top: 0 });
+}
+
+/**
+ * De regreso a la lista: si acabas de guardar un perfume, se centra en
+ * él y parpadea; si no, vuelves a donde ibas.
+ */
+function volverALaLista() {
+  const id = estado.resaltar;
+  estado.resaltar = null;
+  const renglon = id === null ? null : contenido.querySelector<HTMLElement>(`[data-perfume="${id}"]`);
+  if (renglon) {
+    renglon.scrollIntoView({ block: "center" });
+    renglon.classList.add("recien-guardado");
+    setTimeout(() => renglon.classList.remove("recien-guardado"), 2400);
+  } else {
+    window.scrollTo({ top: estado.posicionCatalogo });
+  }
 }
 
 window.addEventListener("hashchange", async () => {

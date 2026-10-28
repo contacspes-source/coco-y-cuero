@@ -4,6 +4,7 @@ import { filtrarPerfumes, FILTROS_INICIALES, resumir, semaforoDe, type FiltrosCa
 import { esDeSesion, mensajeDe } from "../../negocio/errores";
 import { margen, semaforo, type Semaforo } from "../../negocio/precios";
 import { estado, nombreDe, recargar, servicios } from "../estado";
+import { prepararFoto } from "../foto";
 import { avisar, confirmar, fmtPesos, fmtPorcentaje, h, selector, urlDeFoto, vaciar } from "../ui";
 
 export const TEXTO_SEMAFORO: Record<Semaforo, string> = {
@@ -42,6 +43,50 @@ export function vistaCatalogo(alSesionVencida: () => void): HTMLElement {
     pintar();
   };
 
+  // reencuadra en lote las fotos que se subieron antes del ajuste automático
+  const pendientes = servicios.catalogo.fotosParaAjustar(estado.perfumes).length;
+  const botonFotos = h(
+    "button",
+    { type: "button", clase: "boton boton-fantasma", hidden: pendientes === 0, title: "Centra cada perfume con el mismo margen" },
+    "Ajustar fotos",
+  );
+  botonFotos.addEventListener("click", async () => {
+    const total = servicios.catalogo.fotosParaAjustar(estado.perfumes).length;
+    const ok = await confirmar({
+      titulo: `¿Ajustar ${total} ${total === 1 ? "foto" : "fotos"}?`,
+      texto: "Se quita el blanco sobrante y cada perfume queda centrado con el mismo margen, para que ninguno se vea recortado en el sitio. Tarda unos segundos por foto; no cierres la página.",
+      aceptar: "Ajustar",
+    });
+    if (!ok) return;
+    botonFotos.disabled = true;
+    try {
+      const r = await servicios.catalogo.ajustarFotos(
+        estado.perfumes,
+        async (url) => {
+          const resp = await fetch(url);
+          if (!resp.ok) throw new Error("No se pudo leer la foto");
+          return prepararFoto(await resp.blob());
+        },
+        (hechas, t) => (botonFotos.textContent = hechas < t ? `Ajustando ${hechas + 1} de ${t}…` : "Ajustar fotos"),
+      );
+      await recargar();
+      pintar();
+      avisar(
+        r.fallidas.length
+          ? `${r.ajustadas} fotos ajustadas. No se pudieron: ${r.fallidas.join(", ")}.`
+          : `${r.ajustadas} ${r.ajustadas === 1 ? "foto ajustada" : "fotos ajustadas"}. Ya se ven así en el sitio.`,
+        r.fallidas.length ? "error" : "exito",
+      );
+    } catch (e) {
+      avisar(mensajeDe(e), "error");
+      if (esDeSesion(e)) alSesionVencida();
+    } finally {
+      botonFotos.disabled = false;
+      botonFotos.textContent = "Ajustar fotos";
+      botonFotos.hidden = servicios.catalogo.fotosParaAjustar(estado.perfumes).length === 0;
+    }
+  });
+
   async function cambiarPublicado(p: Perfume) {
     if (p.publicado) {
       const ok = await confirmar({
@@ -71,7 +116,7 @@ export function vistaCatalogo(alSesionVencida: () => void): HTMLElement {
     const etiquetaCategoria = nombreDe(catalogos.categorias, p.categoriaId);
     return h(
       "article",
-      { clase: `renglon${p.publicado ? "" : " de-baja"}`, role: "listitem" },
+      { clase: `renglon${p.publicado ? "" : " de-baja"}`, role: "listitem", dataset: { perfume: String(p.id) } },
       h("a", { clase: "renglon-foto", href: `#/perfume/${p.id}`, tabindex: -1, "aria-hidden": "true" }, miniatura(p.imagenUrl, "")),
       h(
         "div",
@@ -254,6 +299,7 @@ export function vistaCatalogo(alSesionVencida: () => void): HTMLElement {
       h(
         "div",
         { clase: "vista-acciones" },
+        botonFotos,
         h("a", { clase: "boton boton-fantasma", href: "#/precios" }, "Ajustar precios"),
         h("a", { clase: "boton boton-primario", href: "#/perfume/nuevo" }, "+ Nuevo perfume"),
       ),

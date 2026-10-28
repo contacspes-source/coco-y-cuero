@@ -41,6 +41,42 @@ export class ServicioCatalogo {
     return this.repo.cambiarPublicado(perfumeId, true);
   }
 
+  /**
+   * Fotos que se pueden reencuadrar en lote: las subidas desde el panel
+   * (viven en Supabase). Las del repositorio ya vienen encuadradas.
+   */
+  fotosParaAjustar(perfumes: Perfume[]): Perfume[] {
+    return perfumes.filter((p) => p.imagenUrl !== null && /^https?:\/\//.test(p.imagenUrl) && !/-enc\.\w+$/.test(p.imagenUrl));
+  }
+
+  /**
+   * Vuelve a encuadrar las fotos una por una. `procesar` recibe la URL
+   * actual y regresa la foto ya preparada (eso necesita el navegador).
+   * Una que falle no detiene a las demás.
+   */
+  async ajustarFotos(
+    perfumes: Perfume[],
+    procesar: (url: string) => Promise<Blob>,
+    alAvanzar: (hechas: number, total: number) => void = () => {},
+  ): Promise<{ ajustadas: number; fallidas: string[] }> {
+    const lista = this.fotosParaAjustar(perfumes);
+    let ajustadas = 0;
+    const fallidas: string[] = [];
+    for (const [i, p] of lista.entries()) {
+      alAvanzar(i, lista.length);
+      try {
+        const foto = await procesar(p.imagenUrl!);
+        const url = await this.subirFoto(foto, p.marca, p.nombre);
+        await this.repo.cambiarFoto(p.id, url);
+        ajustadas++;
+      } catch {
+        fallidas.push(p.nombre);
+      }
+    }
+    alAvanzar(lista.length, lista.length);
+    return { ajustadas, fallidas };
+  }
+
   /** Aplica solo los renglones que cambian. Todos o ninguno. */
   async aplicarAjuste(renglones: RenglonDeAjuste[]): Promise<number> {
     const cambios = cambiosDe(renglones);
@@ -52,7 +88,8 @@ export class ServicioCatalogo {
   subirFoto(foto: Blob, marca: string, nombre: string): Promise<string> {
     const extension = foto.type === "image/png" ? "png" : foto.type === "image/jpeg" ? "jpg" : "webp";
     // nombre único: nunca se pisa una foto que el sitio esté usando
-    const ruta = `${slug(marca, nombre)}-${this.ahora().toString(36)}.${extension}`;
+    // "-enc": ya pasó por el encuadre automático (no hace falta ajustarla)
+    const ruta = `${slug(marca, nombre)}-${this.ahora().toString(36)}-enc.${extension}`;
     return this.fotos.subir(foto, ruta);
   }
 }

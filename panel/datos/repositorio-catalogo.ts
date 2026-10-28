@@ -145,6 +145,16 @@ export class RepositorioCatalogoSupabase implements RepositorioCatalogo {
     }
   }
 
+  async cambiarFoto(perfumeId: number, url: string): Promise<void> {
+    try {
+      const r = await supabase().from("perfume").update({ imagen_url: url }).eq("id", perfumeId).select("id");
+      const filas = revisar(r) as unknown[];
+      if (filas.length === 0) throw traducirError({ code: "42501" });
+    } catch (e) {
+      throw traducirError(e);
+    }
+  }
+
   async actualizarPrecios(cambios: CambioDePrecio[]): Promise<number> {
     try {
       const r = await supabase().rpc("actualizar_precios", {
