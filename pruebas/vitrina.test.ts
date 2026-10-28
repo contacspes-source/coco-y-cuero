@@ -8,6 +8,8 @@ import {
   semillaDelDia,
   sugerenciasDeBusqueda,
   vitrina,
+  iniciarRotacion,
+  siguienteCambio,
 } from "../sitio/negocio/catalogo";
 
 const nota = (n: string, familia: string | null) => ({ nota: n, familia });
@@ -88,4 +90,51 @@ describe("filtros activos", () => {
     expect(quitarFiltro(f, chips[1]!)).toMatchObject({ categoria: null, genero: "dama" });
   });
   test("sin filtros no hay chips", () => expect(filtrosActivos(SIN_FILTROS)).toEqual([]));
+});
+
+describe("vitrina que rota", () => {
+  const muchos = Array.from({ length: 12 }, (_, i) => p({ id: i + 1, marca: `M${i % 5}` }));
+
+  test("arranca con 7 y el resto en fila, sin repetir", () => {
+    const r = iniciarRotacion(muchos, 7, 3);
+    expect(r.mostrados).toHaveLength(7);
+    expect(r.cola).toHaveLength(5);
+    expect(new Set([...r.mostrados, ...r.cola]).size).toBe(12);
+  });
+
+  test("nunca muestra el mismo perfume dos veces a la vez", () => {
+    let r = iniciarRotacion(muchos, 7, 3);
+    for (let i = 0; i < 40; i++) {
+      const c = siguienteCambio(r)!;
+      r = c.rotacion;
+      expect(new Set(r.mostrados).size).toBe(7);
+      expect(r.mostrados[c.lugar]).toBe(c.entra);
+    }
+  });
+
+  test("todos pasan por la vitrina antes de repetir", () => {
+    let r = iniciarRotacion(muchos, 7, 3);
+    const vistos = new Set(r.mostrados);
+    for (let i = 0; i < 5; i++) {
+      const c = siguienteCambio(r)!;
+      vistos.add(c.entra);
+      r = c.rotacion;
+    }
+    expect(vistos.size).toBe(12);
+  });
+
+  test("cambia lugares salteados, no en fila", () => {
+    let r = iniciarRotacion(muchos, 7, 3);
+    const lugares: number[] = [];
+    for (let i = 0; i < 7; i++) {
+      const c = siguienteCambio(r)!;
+      lugares.push(c.lugar);
+      r = c.rotacion;
+    }
+    expect(lugares).toEqual([2, 5, 0, 4, 1, 6, 3]);
+  });
+
+  test("con pocos perfumes no rota", () => {
+    expect(siguienteCambio(iniciarRotacion(muchos.slice(0, 5), 7, 3))).toBeNull();
+  });
 });

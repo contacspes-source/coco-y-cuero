@@ -27,7 +27,9 @@ import {
   quitarFiltro,
   semillaDelDia,
   sugerenciasDeBusqueda,
-  vitrina,
+  iniciarRotacion,
+  siguienteCambio,
+  type Rotacion,
   type Filtros,
   type Orden,
 } from "../negocio/catalogo";
@@ -36,6 +38,7 @@ import { CONFIG, linkWhatsApp } from "./config";
 import { iconoFamilia, iconoWhatsApp } from "./iconos";
 import { abrirApartar, abrirRegistro, estadoBienvenida, iniciarCuenta } from "./cuenta";
 import { vistaDetalle } from "./detalle";
+import { iniciarPortada } from "./portada";
 import { abrirHoja, cerrarHoja, hojaAbierta } from "./hoja";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -278,25 +281,53 @@ function pintarControles() {
   vaciar(barraFijaChips, ...chips());
 }
 
-/** El collage de la vitrina: algunas fotos del catálogo, cambian cada día. */
+/** El collage de la vitrina: frascos del catálogo que van rotando. */
+const LUGARES = 7;
+const CADA_MS = 3200;
+let rotacion: Rotacion | null = null;
+let reloj: number | undefined;
+
+function llenarPieza(a: HTMLAnchorElement, p: PerfumePublico, inicial = false) {
+  a.href = enlaceDe(p);
+  a.dataset.perfume = String(p.id);
+  a.setAttribute("aria-label", `${p.marca} ${p.nombre}`);
+  vaciar(
+    a,
+    h("img", { src: urlDeFoto(p.imagenUrl)!, alt: "", decoding: "async", width: 400, height: 400, loading: inicial ? "eager" : "lazy" }),
+    h("span", { clase: "pieza-nombre" }, h("small", null, p.marca), p.nombre),
+  );
+}
+
+async function cambiarUnaPieza() {
+  if (!rotacion) return;
+  const c = siguienteCambio(rotacion);
+  if (!c) return;
+  const p = perfumes.find((x) => x.id === c.entra);
+  const a = collage.children[c.lugar] as HTMLAnchorElement | undefined;
+  if (!p || !a) return;
+  rotacion = c.rotacion;
+  // se baja la foto antes de girar, para que no aparezca en blanco
+  const previa = new Image();
+  previa.src = urlDeFoto(p.imagenUrl)!;
+  await previa.decode().catch(() => {});
+  a.classList.add("girando");
+  setTimeout(() => {
+    llenarPieza(a, p, true);
+    a.classList.remove("girando");
+  }, 320);
+}
+
 function pintarVitrina() {
-  const elegidos = vitrina(perfumes, 7, SEMILLA);
+  rotacion = iniciarRotacion(perfumes, LUGARES, SEMILLA);
   vaciar(
     collage,
-    ...elegidos.map((p, i) =>
-      h(
-        "a",
-        {
-          clase: `pieza pieza-${i + 1}`,
-          href: enlaceDe(p),
-          "aria-label": `${p.marca} ${p.nombre}`,
-          al: { click: (e) => { e.preventDefault(); abrirDetalle(p); } },
-        },
-        h("img", { src: urlDeFoto(p.imagenUrl)!, alt: "", decoding: "async", width: 400, height: 400, loading: i < 3 ? "eager" : "lazy" }),
-        h("span", { clase: "pieza-nombre" }, h("small", null, p.marca), p.nombre),
-      ),
-    ),
+    ...rotacion.mostrados.map((id, i) => {
+      const a = h("a", { clase: `pieza pieza-${i + 1}` });
+      llenarPieza(a, perfumes.find((x) => x.id === id)!, i < 3);
+      return a;
+    }),
   );
+  iniciarReloj();
   const ideas = sugerenciasDeBusqueda(perfumes, 4);
   sugerencias.hidden = ideas.length === 0;
   vaciar(
@@ -307,6 +338,35 @@ function pintarVitrina() {
     ),
   );
 }
+
+// La vitrina rota sola, pero se detiene cuando no la estás viendo, cuando
+// pasas el mouse o el foco por ella (para poder darle clic con calma) y
+// si tu sistema pide menos movimiento.
+let vitrinaVisible = true;
+let vitrinaQuieta = false;
+const menosMovimiento = matchMedia("(prefers-reduced-motion: reduce)");
+
+function iniciarReloj() {
+  clearInterval(reloj);
+  if (menosMovimiento.matches) return;
+  reloj = window.setInterval(() => {
+    if (vitrinaVisible && !vitrinaQuieta && !document.hidden) void cambiarUnaPieza();
+  }, CADA_MS);
+}
+
+collage.addEventListener("click", (e) => {
+  const a = (e.target as HTMLElement).closest<HTMLAnchorElement>("a.pieza");
+  const p = a && perfumes.find((x) => x.id === Number(a.dataset.perfume));
+  if (!p) return;
+  e.preventDefault();
+  abrirDetalle(p);
+});
+collage.addEventListener("pointerenter", () => (vitrinaQuieta = true));
+collage.addEventListener("pointerleave", () => (vitrinaQuieta = false));
+collage.addEventListener("focusin", () => (vitrinaQuieta = true));
+collage.addEventListener("focusout", () => (vitrinaQuieta = false));
+new IntersectionObserver(([e]) => (vitrinaVisible = e!.isIntersecting)).observe(collage);
+menosMovimiento.addEventListener("change", iniciarReloj);
 
 function irAResultados() {
   filtrosFila.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
@@ -364,12 +424,29 @@ for (const id of ["wa-portada", "wa-originales", "wa-pie", "wa-vacio"]) {
 ($<HTMLAnchorElement>("fb-pie")).href = CONFIG.facebook;
 $("anio").textContent = String(new Date().getFullYear());
 
+// ------------------------------------------------------------ portada
+const desplazar = (id: string) => () =>
+  document.getElementById(id)?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+const portada = iniciarPortada(
+  $("inicio"),
+  $("beneficios"),
+  {
+    catalogo: desplazar("catalogo"),
+    registro: () => void abrirRegistro(),
+    comoPedir: desplazar("pedido"),
+    originales: desplazar("originales"),
+    whatsapp: linkWhatsApp(saludo),
+  },
+  () => estadoBienvenida() !== "usado",
+);
+
 // ------------------------------------------------------------ arranque
 vaciar(rejilla, ...esqueleto());
 cargarCatalogo()
   .then(({ perfumes: lista, origen }) => {
     perfumes = lista;
     pintarVitrina();
+    portada.conPerfumes(perfumes);
     pintar();
     const abierto = leerPerfumeAbierto(location.search);
     const p = abierto === null ? undefined : perfumes.find((x) => x.id === abierto);
@@ -406,4 +483,4 @@ new IntersectionObserver(([e]) => { filtrosVisibles = e!.isIntersecting; actuali
 new IntersectionObserver(([e]) => { rejillaVisible = e!.isIntersecting; actualizarBarra(); }, { rootMargin: "0px 0px -40% 0px" }).observe(rejilla);
 
 // ------------------------------------------------------------ cuenta
-void iniciarCuenta($<HTMLButtonElement>("cuenta-boton"), document.getElementById("promo"), conviene.cargarCuentaAlInicio(), () => {});
+void iniciarCuenta($<HTMLButtonElement>("cuenta-boton"), document.getElementById("promo"), conviene.cargarCuentaAlInicio(), () => portada.refrescar());

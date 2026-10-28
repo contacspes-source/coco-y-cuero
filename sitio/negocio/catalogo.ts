@@ -400,3 +400,42 @@ export function sugerenciasDeBusqueda(perfumes: PerfumePublico[], cuantas = 4): 
   const r = [...notas.slice(0, cuantas - 1), ...marcas.slice(0, 1)];
   return [...new Set(r)].slice(0, cuantas);
 }
+
+// ------------------------------------------------------------------
+// Vitrina que rota: cada pocos segundos un lugar del collage cambia de
+// perfume. Pura y con estado explícito para poder probarla.
+// ------------------------------------------------------------------
+
+/** Orden en que cambian los lugares: salteado, para que no se note un patrón. */
+export const ORDEN_DE_CAMBIO = [2, 5, 0, 4, 1, 6, 3] as const;
+
+export interface Rotacion {
+  /** id del perfume en cada lugar del collage */
+  mostrados: number[];
+  /** los que esperan turno, en orden */
+  cola: number[];
+  /** cuántos cambios van (decide qué lugar toca) */
+  paso: number;
+}
+
+/** Arranca con los primeros `lugares` de la vitrina; el resto hace fila. */
+export function iniciarRotacion(perfumes: PerfumePublico[], lugares: number, semilla: number): Rotacion {
+  const todos = vitrina(perfumes, perfumes.length, semilla).map((p) => p.id);
+  return { mostrados: todos.slice(0, lugares), cola: todos.slice(lugares), paso: 0 };
+}
+
+/**
+ * Siguiente cambio: qué lugar cambia y por cuál perfume. El que sale va
+ * al final de la fila, así todos pasan por la vitrina antes de repetir.
+ * null si no hay con qué rotar (catálogo chico).
+ */
+export function siguienteCambio(r: Rotacion): { lugar: number; entra: number; rotacion: Rotacion } | null {
+  if (r.cola.length === 0 || r.mostrados.length === 0) return null;
+  const orden = ORDEN_DE_CAMBIO.filter((i) => i < r.mostrados.length);
+  const lugar = orden.length ? orden[r.paso % orden.length]! : r.paso % r.mostrados.length;
+  const [entra, ...resto] = r.cola as [number, ...number[]];
+  const sale = r.mostrados[lugar]!;
+  const mostrados = [...r.mostrados];
+  mostrados[lugar] = entra;
+  return { lugar, entra, rotacion: { mostrados, cola: [...resto, sale], paso: r.paso + 1 } };
+}
