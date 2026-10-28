@@ -277,3 +277,126 @@ export function conPerfume(busquedaActual: string, id: number | null): string {
   const s = q.toString();
   return s ? `?${s}` : "";
 }
+
+// ------------------------------------------------------------------
+// Vitrina: fotos de referencia para el encabezado del catálogo y las
+// tarjetas de filtro. Cambian cada día (semilla = día del año) pero no
+// en cada recarga, para que la página no "brinque".
+// ------------------------------------------------------------------
+
+/** Número pseudoaleatorio estable a partir de una semilla (mulberry32). */
+function aleatorio(semilla: number): () => number {
+  let a = semilla >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function barajar<T>(lista: T[], semilla: number): T[] {
+  const r = aleatorio(semilla);
+  const copia = [...lista];
+  for (let i = copia.length - 1; i > 0; i--) {
+    const j = Math.floor(r() * (i + 1));
+    [copia[i], copia[j]] = [copia[j]!, copia[i]!];
+  }
+  return copia;
+}
+
+/** Día del año (1–366): la semilla de la vitrina. */
+export function semillaDelDia(fecha: Date): number {
+  const inicio = new Date(fecha.getFullYear(), 0, 0);
+  return fecha.getFullYear() * 1000 + Math.floor((fecha.getTime() - inicio.getTime()) / 86_400_000);
+}
+
+const conFoto = (p: PerfumePublico) => Boolean(p.imagenUrl);
+
+/**
+ * Hasta `cuantos` perfumes con foto, alternando categoría y género para
+ * que la vitrina no salga toda de una sola marca o tipo.
+ */
+export function vitrina(perfumes: PerfumePublico[], cuantos: number, semilla: number): PerfumePublico[] {
+  const grupos = new Map<string, PerfumePublico[]>();
+  for (const p of barajar(perfumes.filter(conFoto), semilla)) {
+    const clave = `${p.categoria}|${p.genero}`;
+    grupos.set(clave, [...(grupos.get(clave) ?? []), p]);
+  }
+  const colas = barajar([...grupos.values()], semilla + 1);
+  const elegidos: PerfumePublico[] = [];
+  const marcas = new Set<string>();
+  // primera vuelta: una marca distinta por grupo; luego lo que falte
+  for (const pasada of [true, false]) {
+    let quedan = true;
+    while (elegidos.length < cuantos && quedan) {
+      quedan = false;
+      for (const cola of colas) {
+        const i = cola.findIndex((p) => !elegidos.includes(p) && (!pasada || !marcas.has(p.marca)));
+        if (i < 0) continue;
+        const p = cola[i]!;
+        elegidos.push(p);
+        marcas.add(p.marca);
+        quedan = true;
+        if (elegidos.length === cuantos) break;
+      }
+    }
+  }
+  return elegidos;
+}
+
+/** Fotos de muestra para una tarjeta de filtro (p. ej. "Dama"). */
+export function muestras(
+  perfumes: PerfumePublico[],
+  criterio: (p: PerfumePublico) => boolean,
+  cuantos: number,
+  semilla: number,
+): PerfumePublico[] {
+  return barajar(perfumes.filter((p) => conFoto(p) && criterio(p)), semilla).slice(0, cuantos);
+}
+
+// ------------------------------------------------------------------
+// Filtros activos como "chips" que se quitan con un toque
+// ------------------------------------------------------------------
+
+export type FiltroActivo =
+  | { tipo: "genero"; etiqueta: string }
+  | { tipo: "categoria"; etiqueta: string }
+  | { tipo: "aroma"; clave: string; etiqueta: string }
+  | { tipo: "texto"; etiqueta: string };
+
+export function filtrosActivos(f: Filtros): FiltroActivo[] {
+  const r: FiltroActivo[] = [];
+  if (f.genero) r.push({ tipo: "genero", etiqueta: GENEROS.find((g) => g.clave === f.genero)?.nombre ?? f.genero });
+  if (f.categoria) r.push({ tipo: "categoria", etiqueta: CATEGORIAS.find((c) => c.clave === f.categoria)?.nombre ?? f.categoria });
+  for (const a of f.aromas) r.push({ tipo: "aroma", clave: a, etiqueta: FAMILIAS.find((x) => x.clave === a)?.corto ?? a });
+  if (f.texto.trim()) r.push({ tipo: "texto", etiqueta: `“${f.texto.trim()}”` });
+  return r;
+}
+
+export function quitarFiltro(f: Filtros, chip: FiltroActivo): Filtros {
+  switch (chip.tipo) {
+    case "genero":
+      return { ...f, genero: null };
+    case "categoria":
+      return { ...f, categoria: null };
+    case "aroma":
+      return { ...f, aromas: f.aromas.filter((a) => a !== chip.clave) };
+    case "texto":
+      return { ...f, texto: "" };
+  }
+}
+
+/** Ideas para el buscador: las notas y marcas que más se repiten. */
+export function sugerenciasDeBusqueda(perfumes: PerfumePublico[], cuantas = 4): string[] {
+  const contar = (lista: string[]) => {
+    const m = new Map<string, number>();
+    for (const x of lista) m.set(x, (m.get(x) ?? 0) + 1);
+    return [...m].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "es")).map(([x]) => x);
+  };
+  const notas = contar(perfumes.flatMap((p) => [...new Set(p.notas.map((n) => n.nota.toLowerCase()))]));
+  const marcas = contar(perfumes.map((p) => p.marca));
+  const r = [...notas.slice(0, cuantas - 1), ...marcas.slice(0, 1)];
+  return [...new Set(r)].slice(0, cuantas);
+}
