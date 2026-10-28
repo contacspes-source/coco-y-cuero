@@ -912,3 +912,8 @@ a:focus-visible, button:focus-visible, input:focus-visible{
 @media (prefers-reduced-motion: reduce){
   .diapo-texto > *,.arte-pasos li,.arte-pago li{opacity:1;transform:none}
 }
+
+/* catálogo que no cargó */
+.vacio strong{color:var(--ebano)}
+.boton-reintentar{display:flex;margin:18px auto 10px;width:fit-content}
+.detalle-error{display:block;margin-top:8px;font-size:11px;color:var(--tinta-suave);opacity:.7;word-break:break-word}

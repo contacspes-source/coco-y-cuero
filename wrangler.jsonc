@@ -1,7 +1,13 @@
 {
   "name": "coco-y-cuero",
   "compatibility_date": "2026-10-19",
-  // Solo se publica lo compilado: el sitio público y el panel en /panel/.
+  // El Worker solo atiende /api/catalogo y /fotos/* (ver worker/index.ts);
+  // todo lo demás lo sirve Cloudflare directo desde dist/ sin ejecutarlo.
   // Código fuente, migraciones y pruebas nunca llegan al servidor.
-  "assets": { "directory": "./dist" }
+  "main": "worker/index.ts",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*", "/fotos/*"]
+  }
 }

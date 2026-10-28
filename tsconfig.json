@@ -17,5 +17,5 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["compartido", "panel", "sitio", "pruebas", "vitest.config.ts"]
+  "include": ["compartido", "panel", "sitio", "worker", "pruebas", "vitest.config.ts"]
 }

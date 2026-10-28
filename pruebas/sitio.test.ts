@@ -15,7 +15,7 @@ import {
   textoNotas,
   type Filtros,
 } from "../sitio/negocio/catalogo";
-import { CatalogoNoDisponible, FuenteCatalogo, URL_EN_VIVO, URL_RESPALDO, aPerfume } from "../sitio/datos/fuente-catalogo";
+import { CatalogoNoDisponible, FuenteCatalogo, URL_EN_VIVO, URL_PROPIA, URL_RESPALDO, aPerfume } from "../sitio/datos/fuente-catalogo";
 
 const nota = (n: string, familia: string | null) => ({ nota: n, familia });
 
@@ -125,13 +125,44 @@ const fila = { id: 1, marca: "Lattafa", nombre: "Asad", tipo: "EDP", genero: "ca
 const respuesta = (cuerpo: unknown, status = 200) => new Response(JSON.stringify(cuerpo), { status });
 
 describe("FuenteCatalogo", () => {
-  test("usa la base en vivo cuando responde", async () => {
+  test("primero lo pide a nuestro propio dominio", async () => {
     const pedidas: string[] = [];
     const f = new FuenteCatalogo(async (url) => (pedidas.push(url), respuesta([fila])));
     const r = await f.cargar();
     expect(r.origen).toBe("en-vivo");
     expect(r.perfumes[0]?.presentaciones[0]?.precio).toBe(870); // el numeric llega como texto
-    expect(pedidas).toEqual([URL_EN_VIVO]);
+    expect(pedidas).toEqual([URL_PROPIA]);
+  });
+
+  test("si la red bloquea nuestro dominio /api, va directo a Supabase", async () => {
+    const pedidas: string[] = [];
+    const f = new FuenteCatalogo(async (url) => {
+      pedidas.push(url);
+      if (url === URL_PROPIA) throw new TypeError("Load failed");
+      return respuesta([fila]);
+    });
+    expect((await f.cargar()).origen).toBe("en-vivo");
+    expect(pedidas).toEqual([URL_PROPIA, URL_EN_VIVO]);
+  });
+
+  test("si bloquean supabase.co, el catálogo llega por nuestro dominio", async () => {
+    const f = new FuenteCatalogo(async (url) => {
+      if (url.includes("supabase.co")) throw new TypeError("Load failed");
+      return url === URL_PROPIA ? respuesta([fila]) : respuesta({}, 404);
+    });
+    expect((await f.cargar()).origen).toBe("en-vivo");
+  });
+
+  test("una página HTML en lugar del catálogo no cuenta", async () => {
+    const f = new FuenteCatalogo(async (url) =>
+      url === URL_RESPALDO ? respuesta([fila]) : new Response("<!doctype html>", { status: 200, headers: { "Content-Type": "text/html" } }),
+    );
+    expect((await f.cargar()).origen).toBe("respaldo");
+  });
+
+  test("un catálogo vacío en vivo se considera falla", async () => {
+    const f = new FuenteCatalogo(async (url) => (url === URL_RESPALDO ? respuesta([fila]) : respuesta([])));
+    expect((await f.cargar()).origen).toBe("respaldo");
   });
 
   test("si la base falla, usa el respaldo", async () => {
@@ -147,9 +178,12 @@ describe("FuenteCatalogo", () => {
     expect((await f.cargar()).origen).toBe("respaldo");
   });
 
-  test("si fallan los dos, avisa con un error claro", async () => {
+  test("si fallan todos, avisa con un error claro y dice qué falló", async () => {
     const f = new FuenteCatalogo(async () => respuesta({}, 500));
-    await expect(f.cargar()).rejects.toBeInstanceOf(CatalogoNoDisponible);
+    const e = await f.cargar().catch((x) => x);
+    expect(e).toBeInstanceOf(CatalogoNoDisponible);
+    expect(e.detalles).toHaveLength(3);
+    expect(e.detalles[0]).toBe("/api/catalogo: HTTP 500");
   });
 
   test("descarta renglones rotos y precios en cero", () => {

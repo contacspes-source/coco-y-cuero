@@ -4,7 +4,8 @@
  */
 import "../estilos.css";
 import { h, vaciar } from "../../compartido/dom";
-import { urlDeFoto } from "../../compartido/texto";
+import { SUPABASE_URL } from "../../compartido/config";
+import { urlDeFoto, urlDirectaDeFoto, usarFotosPorNuestroDominio } from "../../compartido/texto";
 import type { PerfumePublico } from "../../compartido/tipos";
 import {
   CATEGORIAS,
@@ -175,10 +176,13 @@ function esqueleto(): HTMLElement[] {
 }
 
 // ------------------------------------------------------------ controles
+/** Hasta que llega el catálogo no se pinta nada (si no, se verían ceros). */
+let cargado = false;
+
 function cambiar(parcial: Partial<Filtros>) {
   filtros = { ...filtros, ...parcial };
   history.replaceState(null, "", `${location.pathname}${escribirFiltros(filtros)}${location.hash}`);
-  pintar();
+  if (cargado) pintar();
 }
 
 /** Miniatura redonda de un perfume (para tarjetas de filtro). */
@@ -441,10 +445,31 @@ const portada = iniciarPortada(
 );
 
 // ------------------------------------------------------------ arranque
+// Fotos de Supabase por nuestro dominio (/fotos/…), salvo en `npm run dev`.
+// Si alguna no llega por ahí, se intenta directo una vez.
+usarFotosPorNuestroDominio(!/^(localhost|127\.|\[::1\])/.test(location.hostname));
+document.addEventListener(
+  "error",
+  (e) => {
+    const img = e.target;
+    if (!(img instanceof HTMLImageElement) || img.dataset.reintento) return;
+    const directa = urlDirectaDeFoto(img.currentSrc || img.src, SUPABASE_URL);
+    if (!directa) return;
+    img.dataset.reintento = "1";
+    img.src = directa;
+  },
+  true,
+);
+
+function cargar() {
 vaciar(rejilla, ...esqueleto());
+rejilla.setAttribute("aria-busy", "true");
+vacio.hidden = true;
+conteo.textContent = "· cargando…";
 cargarCatalogo()
   .then(({ perfumes: lista, origen }) => {
     perfumes = lista;
+    cargado = true;
     pintarVitrina();
     portada.conPerfumes(perfumes);
     pintar();
@@ -457,14 +482,25 @@ cargarCatalogo()
       );
     }
   })
-  .catch(() => {
+  .catch((e: unknown) => {
     rejilla.setAttribute("aria-busy", "false");
     vaciar(rejilla);
-    pintarControles();
     resumen.textContent = "";
+    conteo.textContent = "· sin conexión";
     vacio.hidden = false;
-    vacioTexto.textContent = "No pudimos cargar el catálogo en este momento.";
+    const detalles = (e as { detalles?: string[] }).detalles ?? [];
+    vaciar(
+      vacioTexto,
+      h("strong", null, "No pudimos cargar el catálogo. "),
+      document.createTextNode("Revisa tu conexión a internet e inténtalo de nuevo."),
+      h("button", { type: "button", clase: "boton boton-oscuro boton-reintentar", al: { click: cargar } }, "Reintentar"),
+      // pista para nosotros si nos mandan captura
+      ...(detalles.length ? [h("small", { clase: "detalle-error" }, detalles.join(" · "))] : []),
+    );
+    vacio.scrollIntoView({ block: "nearest" });
   });
+}
+cargar();
 
 // ------------------------------------------------------------ barra fija
 // Al bajar por los perfumes, una barra delgada recuerda qué filtros hay
