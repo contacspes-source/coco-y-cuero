@@ -1,14 +1,17 @@
 # Encabezados de seguridad que Cloudflare agrega a cada respuesta.
+# Qué hace cada uno: docs/SEGURIDAD.md → "Encabezados".
 
 /*
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Frame-Options: SAMEORIGIN
 
 /panel/*
   X-Frame-Options: DENY
   X-Robots-Tag: noindex, nofollow
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https://hsdthxlymeldxcoolmar.supabase.co; connect-src 'self' https://hsdthxlymeldxcoolmar.supabase.co wss://hsdthxlymeldxcoolmar.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https://hsdthxlymeldxcoolmar.supabase.co; connect-src 'self' https://hsdthxlymeldxcoolmar.supabase.co wss://hsdthxlymeldxcoolmar.supabase.co; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
 
 # el HTML del panel siempre se pide fresco; los archivos compilados
 # llevan huella en el nombre y pueden guardarse un año

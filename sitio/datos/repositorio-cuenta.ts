@@ -73,7 +73,12 @@ export class RepositorioCuenta {
     return Number(revisar(await db.rpc("mi_descuento_bienvenida")) ?? 0);
   }
 
-  async registrar(d: DatosDeRegistro, volverA: string): Promise<{ requiereConfirmacion: boolean }> {
+  /**
+   * `captcha` es el token de Turnstile. Supabase lo verifica con la
+   * llave secreta y rechaza la llamada si falta o no sirve; así un
+   * script no puede crear cuentas en masa.
+   */
+  async registrar(d: DatosDeRegistro, volverA: string, captcha: string): Promise<{ requiereConfirmacion: boolean }> {
     const db = await supabase();
     // los datos viajan como metadatos; el trigger de la base crea el
     // expediente y le asigna número de cliente (nunca el rol)
@@ -82,14 +87,25 @@ export class RepositorioCuenta {
       password: d.contrasena,
       options: {
         emailRedirectTo: volverA,
+        captchaToken: captcha || undefined,
         data: { nombre: d.nombre, telefono: d.telefono, direccion: d.direccion, ciudad: d.ciudad, canal: d.canal },
       },
     });
     if (error) {
+      const codigo = (error as { code?: string }).code ?? "";
       if (/already registered|already been registered/i.test(error.message)) {
         throw new ErrorDeDatos("duplicado", "Ya existe una cuenta con ese correo. Inicia sesión o recupera tu contraseña.");
       }
-      if (/not authorized|email_address_not_authorized|rate limit/i.test(`${error.message} ${(error as { code?: string }).code ?? ""}`)) {
+      if (/captcha/i.test(`${error.message} ${codigo}`)) {
+        throw new ErrorDeDatos("regla", "No pasó la verificación de seguridad. Recarga la página e inténtalo de nuevo.");
+      }
+      // el hook "antes de crear usuario" o el trigger rechazaron el correo
+      // (dominio desechable): Supabase lo reporta como error del hook o
+      // como "Database error saving new user"
+      if (/desechable|temporal|hook|database error saving new user/i.test(`${error.message} ${codigo}`)) {
+        throw new ErrorDeDatos("regla", "No aceptamos correos temporales o desechables. Usa tu correo personal.");
+      }
+      if (/not authorized|email_address_not_authorized|rate limit|over_email_send_rate_limit/i.test(`${error.message} ${codigo}`)) {
         throw new ErrorDeDatos("red", "No pudimos enviarte el correo de confirmación en este momento. Pide tu perfume por WhatsApp y te registramos nosotros.");
       }
       if (/password/i.test(error.message)) {
@@ -100,9 +116,13 @@ export class RepositorioCuenta {
     return { requiereConfirmacion: !data.session };
   }
 
-  async entrar(correo: string, contrasena: string): Promise<void> {
+  async entrar(correo: string, contrasena: string, captcha: string): Promise<void> {
     const db = await supabase();
-    const { error } = await db.auth.signInWithPassword({ email: correo, password: contrasena });
+    const { error } = await db.auth.signInWithPassword({
+      email: correo,
+      password: contrasena,
+      options: { captchaToken: captcha || undefined },
+    });
     if (error) throw traducirError(error);
   }
 
@@ -111,9 +131,9 @@ export class RepositorioCuenta {
     await db.auth.signOut();
   }
 
-  async recuperar(correo: string, volverA: string): Promise<void> {
+  async recuperar(correo: string, volverA: string, captcha: string): Promise<void> {
     const db = await supabase();
-    const { error } = await db.auth.resetPasswordForEmail(correo, { redirectTo: volverA });
+    const { error } = await db.auth.resetPasswordForEmail(correo, { redirectTo: volverA, captchaToken: captcha || undefined });
     if (error) throw traducirError(error);
   }
 

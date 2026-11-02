@@ -5,7 +5,7 @@
 -- Supabase y ejecútalo. Todo corre dentro de una transacción que
 -- termina en ROLLBACK, así que NO deja datos de prueba.
 --
--- Resultado esperado: las 66 filas con estado = 'OK'.
+-- Resultado esperado: las 74 filas con estado = 'OK' (la numeración salta del 8 al 11).
 -- Si alguna dice 'FALLA', no publiques el cambio que hiciste.
 --
 -- Córrelas cada vez que toques una política RLS, un GRANT o una
@@ -405,6 +405,52 @@ begin
   select (has_table_privilege('anon','public.perfume','TRUNCATE')
        or has_table_privilege('authenticated','public.pedido','TRUNCATE'))::text into r;
   insert into _p values (68,'nadie de fuera puede vaciar tablas','false',r);
+
+  -- ===== 015: REGISTRO ENDURECIDO =====
+  -- un bot se registra con correo desechable: el trigger lo rechaza
+  begin
+    insert into auth.users (id, email, raw_user_meta_data)
+    values ('dddddddd-0000-0000-0000-000000000004', 'bot@mailinator.com', '{}');
+    r := 'SE REGISTRO';
+  exception when others then r := 'rechazado';
+  end;
+  insert into _p values (69,'registro con correo desechable','rechazado',r);
+
+  -- el hook de Supabase Auth responde con error solo a los desechables
+  select (public.hook_antes_de_crear_usuario('{"user":{"email":"x@sub.yopmail.com"}}') ? 'error')::text into r;
+  insert into _p values (70,'hook rechaza correo desechable','true',r);
+  select (public.hook_antes_de_crear_usuario('{"user":{"email":"x@gmail.com"}}') = '{}'::jsonb)::text into r;
+  insert into _p values (71,'hook deja pasar correo normal','true',r);
+
+  -- metadatos gigantes al registrarse: se recortan, no tumban el registro
+  insert into auth.users (id, email, raw_user_meta_data)
+  values ('eeeeeeee-0000-0000-0000-000000000005', 'largo@prueba.mx',
+          jsonb_build_object('nombre', repeat('x', 5000), 'direccion', repeat('y', 5000), 'ciudad', repeat('z', 500)));
+  select (length(nombre) = 120 and length(direccion) = 300 and length(ciudad) = 60)::text into r
+  from public.cliente where auth_user_id = 'eeeeeeee-0000-0000-0000-000000000005';
+  insert into _p values (72,'metadatos gigantes se recortan al registrarse','true',r);
+
+  -- una cuenta no puede guardar textos sin tope
+  perform set_config('request.jwt.claims','{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}', true);
+  set local role authenticated;
+  begin update public.cliente set nombre = repeat('x', 121) where auth_user_id = auth.uid(); r := 'ACEPTO';
+  exception when check_violation then r := 'rechazado'; end;
+  reset role; insert into _p values (73,'cliente guarda nombre de 121 caracteres','rechazado',r);
+  perform set_config('request.jwt.claims','{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}', true);
+  set local role authenticated;
+  begin update public.cliente set direccion = repeat('x', 301) where auth_user_id = auth.uid(); r := 'ACEPTO';
+  exception when check_violation then r := 'rechazado'; end;
+  reset role; insert into _p values (74,'cliente guarda direccion de 301 caracteres','rechazado',r);
+
+  -- la lista de desechables y el hook no son parte de la API
+  set local role anon;
+  begin perform * from privado.dominio_desechable; r := 'LEYO';
+  exception when insufficient_privilege then r := 'bloqueado'; end;
+  reset role; insert into _p values (75,'anon lee la lista de desechables','bloqueado',r);
+  set local role authenticated;
+  begin perform public.hook_antes_de_crear_usuario('{}'); r := 'EJECUTO';
+  exception when insufficient_privilege then r := 'bloqueado'; end;
+  reset role; insert into _p values (76,'cliente llama al hook de registro','bloqueado',r);
 end $$;
 
 select n, prueba, esperado, obtenido,

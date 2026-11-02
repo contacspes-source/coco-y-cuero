@@ -32,7 +32,8 @@ class SesionFalsa implements RepositorioSesion {
   contrasena = "";
   async usuarioActual() { return this.usuario; }
   async rolDe() { return this.rol; }
-  async iniciarSesion(correo: string) { this.usuario = { id: "u1", correo }; return this.usuario; }
+  captcha: string | null = null;
+  async iniciarSesion(correo: string, _c: string, captcha: string) { this.captcha = captcha; this.usuario = { id: "u1", correo }; return this.usuario; }
   async cerrarSesion() { this.cerrada++; this.usuario = null; }
   async enviarCorreoDeRecuperacion() {}
   async cambiarContrasena(n: string) { this.contrasena = n; }
@@ -116,14 +117,27 @@ describe("ServicioSesion", () => {
     const repo = new SesionFalsa();
     repo.rol = "cliente";
     const s = new ServicioSesion(repo);
-    await expect(s.entrar("ana@prueba.mx", "x")).rejects.toBeInstanceOf(ErrorDeAcceso);
+    await expect(s.entrar("ana@prueba.mx", "x", "tok")).rejects.toBeInstanceOf(ErrorDeAcceso);
     expect(repo.cerrada).toBe(1);
     expect(repo.usuario).toBeNull();
   });
 
   test("el admin entra con su correo normalizado", async () => {
     const s = new ServicioSesion(new SesionFalsa());
-    expect(await s.entrar("  Jorge@Prueba.MX ", "x")).toBe("jorge@prueba.mx");
+    expect(await s.entrar("  Jorge@Prueba.MX ", "x", "tok")).toBe("jorge@prueba.mx");
+  });
+
+  test("el token del CAPTCHA llega al repositorio", async () => {
+    const repo = new SesionFalsa();
+    await new ServicioSesion(repo).entrar("jorge@prueba.mx", "x", "token-turnstile");
+    expect(repo.captcha).toBe("token-turnstile");
+  });
+
+  test("la contraseña nueva del admin exige letras y números", async () => {
+    const s = new ServicioSesion(new SesionFalsa());
+    await expect(s.cambiarContrasena("12345678", "12345678")).rejects.toBeInstanceOf(ErrorDeValidacion);
+    await expect(s.cambiarContrasena("soloLetras", "soloLetras")).rejects.toBeInstanceOf(ErrorDeValidacion);
+    await expect(s.cambiarContrasena("clave1234", "clave1234")).resolves.toBeUndefined();
   });
 
   test("una sesión guardada de cliente no abre el panel", async () => {

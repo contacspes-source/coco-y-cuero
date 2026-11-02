@@ -18,8 +18,12 @@ export class RepositorioSesionSupabase implements RepositorioSesion {
     return (r.data?.rol as Rol | undefined) ?? null;
   }
 
-  async iniciarSesion(correo: string, contrasena: string): Promise<Usuario> {
-    const { data, error } = await supabase().auth.signInWithPassword({ email: correo, password: contrasena });
+  async iniciarSesion(correo: string, contrasena: string, captcha: string): Promise<Usuario> {
+    const { data, error } = await supabase().auth.signInWithPassword({
+      email: correo,
+      password: contrasena,
+      options: { captchaToken: captcha || undefined },
+    });
     if (error) throw traducirError(error);
     if (!data.user) throw new ErrorDeDatos("credenciales", "No se pudo iniciar sesión.");
     return { id: data.user.id, correo: data.user.email ?? correo };
@@ -29,8 +33,8 @@ export class RepositorioSesionSupabase implements RepositorioSesion {
     await supabase().auth.signOut();
   }
 
-  async enviarCorreoDeRecuperacion(correo: string, volverA: string): Promise<void> {
-    const { error } = await supabase().auth.resetPasswordForEmail(correo, { redirectTo: volverA });
+  async enviarCorreoDeRecuperacion(correo: string, volverA: string, captcha: string): Promise<void> {
+    const { error } = await supabase().auth.resetPasswordForEmail(correo, { redirectTo: volverA, captchaToken: captcha || undefined });
     if (error) throw traducirError(error);
   }
 

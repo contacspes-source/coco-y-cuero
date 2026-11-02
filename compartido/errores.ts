@@ -41,6 +41,9 @@ export function traducirError(e: unknown): ErrorDeDatos {
     if (err.status === 429) {
       return new ErrorDeDatos("red", "Demasiados intentos. Espera un minuto y vuelve a probar.");
     }
+    if (/captcha/i.test(`${msg} ${err.code ?? ""}`)) {
+      return new ErrorDeDatos("regla", "No pasó la verificación de seguridad. Recarga la página e inténtalo de nuevo.");
+    }
     return new ErrorDeDatos("credenciales", msg);
   }
 

@@ -3,6 +3,7 @@
  * (inyección de dependencias): en producción son los de Supabase, en
  * las pruebas son falsos en memoria.
  */
+import { problemaDeContrasena } from "../../compartido/contrasena";
 import type { Catalogos, Perfume, PerfumeEditable } from "../../compartido/tipos";
 import type { RepositorioCatalogo, RepositorioFotos, RepositorioSesion, EventoDeSesion } from "../datos/contratos";
 import { RepositorioCatalogoSupabase } from "../datos/repositorio-catalogo";
@@ -94,7 +95,7 @@ export class ServicioCatalogo {
   }
 }
 
-export const LARGO_MINIMO_CONTRASENA = 8;
+export { LARGO_MINIMO_CONTRASENA } from "../../compartido/contrasena";
 
 export class ServicioSesion {
   constructor(private readonly repo: RepositorioSesion) {}
@@ -110,8 +111,8 @@ export class ServicioSesion {
     return u.correo;
   }
 
-  async entrar(correo: string, contrasena: string): Promise<string> {
-    const u = await this.repo.iniciarSesion(correo.trim().toLowerCase(), contrasena);
+  async entrar(correo: string, contrasena: string, captcha: string): Promise<string> {
+    const u = await this.repo.iniciarSesion(correo.trim().toLowerCase(), contrasena, captcha);
     if ((await this.repo.rolDe(u)) !== "admin") {
       await this.repo.cerrarSesion();
       throw new ErrorDeAcceso();
@@ -123,16 +124,13 @@ export class ServicioSesion {
     return this.repo.cerrarSesion();
   }
 
-  recuperar(correo: string, volverA: string): Promise<void> {
-    return this.repo.enviarCorreoDeRecuperacion(correo.trim().toLowerCase(), volverA);
+  recuperar(correo: string, volverA: string, captcha: string): Promise<void> {
+    return this.repo.enviarCorreoDeRecuperacion(correo.trim().toLowerCase(), volverA, captcha);
   }
 
   async cambiarContrasena(nueva: string, confirmacion: string): Promise<void> {
-    if (nueva.length < LARGO_MINIMO_CONTRASENA) {
-      throw new ErrorDeValidacion([
-        { campo: "contrasena", mensaje: `Usa al menos ${LARGO_MINIMO_CONTRASENA} caracteres.` },
-      ]);
-    }
+    const problema = problemaDeContrasena(nueva);
+    if (problema) throw new ErrorDeValidacion([{ campo: "contrasena", mensaje: problema }]);
     if (nueva !== confirmacion) {
       throw new ErrorDeValidacion([{ campo: "confirmacion", mensaje: "Las contraseñas no coinciden." }]);
     }

@@ -12,3 +12,15 @@ export const SUPABASE_LLAVE_PUBLICABLE = "sb_publishable_ZROgURMmmu34nTvF3uJrew_
 
 /** Bucket de Supabase Storage donde viven las fotos de producto. */
 export const BUCKET_FOTOS = "perfumes";
+
+/**
+ * Llave PÚBLICA (site key) del widget de Cloudflare Turnstile. La llave
+ * secreta va solo en Supabase → Authentication → Attack Protection.
+ *
+ * La que está aquí es la llave de PRUEBA de Cloudflare: muestra el
+ * widget y siempre pasa. Cámbiala por la de tu widget real
+ * (Cloudflare → Turnstile → Add widget, dominio cocoycuero.com) y pon su
+ * secreto en Supabase. Si la dejas vacía (""), el CAPTCHA se apaga.
+ * Ver docs/SEGURIDAD.md.
+ */
+export const TURNSTILE_SITE_KEY = "1x00000000000000000000AA";

@@ -21,7 +21,8 @@ Sitio de venta de perfumes árabes, de nicho y de diseñador, y su panel adminis
 │   ├── presentacion/            pantallas: login, catálogo, formulario, precios
 │   ├── negocio/                 reglas: motor de precios, validación, casos de uso
 │   └── datos/                   repositorios: el único lugar que habla con Supabase
-├── compartido/                  tipos del dominio y configuración pública
+├── compartido/                  tipos del dominio, configuración pública, CAPTCHA, regla de contraseñas
+├── docs/SEGURIDAD.md            amenazas, controles, checklist de configuración y guion de pentest
 ├── pruebas/                     pruebas automáticas (npm test)
 ├── supabase/                    migraciones SQL y pruebas de seguridad
 ├── scripts/finalizar.mjs        encabezados y respaldo del catálogo en dist/
@@ -39,7 +40,7 @@ presentacion  →  negocio  →  datos  →  Supabase
 
 Aplica igual al sitio y al panel. Cada capa solo usa la de abajo, y el sitio y el panel no comparten código entre sí, solo `compartido/`. Las pantallas nunca hablan directo con Supabase; las reglas de negocio no saben qué es HTML. `pruebas/arquitectura.test.ts` revisa los `import` de cada archivo y falla si alguien rompe la regla.
 
-La seguridad no depende del panel: aunque alguien abra la consola del navegador, la base de datos (RLS) es la que decide qué puede leer y escribir cada cuenta.
+La seguridad no depende del panel: aunque alguien abra la consola del navegador, la base de datos (RLS) es la que decide qué puede leer y escribir cada cuenta. Registro, login y recuperación de contraseña exigen un CAPTCHA (Cloudflare Turnstile) que verifica Supabase. Todo está explicado en **`docs/SEGURIDAD.md`**, incluida la configuración que hay que hacer en Supabase y Cloudflare para que funcione.
 
 ## Trabajar en tu computadora
 
@@ -49,7 +50,7 @@ Requiere Node.js 22 o más nuevo.
 npm install          # una sola vez
 npm run dev          # sitio en http://localhost:5174/
 npm run dev:panel    # panel en http://localhost:5173/panel/
-npm test             # 300 pruebas
+npm test             # 306 pruebas
 npm run build        # revisa tipos, compila y arma dist/
 ```
 
@@ -60,8 +61,8 @@ npm run build        # revisa tipos, compila y arma dist/
 ## Calidad
 
 - **TypeScript estricto**: errores de tipos frenan la compilación.
-- **300 pruebas automáticas**: motor de precios, validación, filtros, ajuste masivo, catálogo con la base caída, estados de pedido, registro de clientes, detalle del perfume, periodos y CSV de reportes, casos de uso con repositorios falsos y regla de capas.
-- **66 pruebas de seguridad en la base** (`supabase/pruebas/seguridad.sql`).
+- **306 pruebas automáticas**: motor de precios, validación, filtros, ajuste masivo, catálogo con la base caída, estados de pedido, registro de clientes, detalle del perfume, periodos y CSV de reportes, casos de uso con repositorios falsos y regla de capas.
+- **74 pruebas de seguridad en la base** (`supabase/pruebas/seguridad.sql`).
 - **GitHub Actions** corre todo en cada push; si algo falla, el commit sale en rojo.
 
 ## Agregar o cambiar perfumes
