@@ -94,12 +94,12 @@ actives**. Hazlo en este orden y marca cada punto.
    Supabase → **Authentication → Attack Protection → Enable Captcha
    protection** → Provider *Turnstile* → pega el secreto → Save.
 
-Mientras no hagas esto, el código trae la llave de **prueba** de
-Cloudflare (`1x00000000000000000000AA`): el widget aparece y siempre
-pasa, así que **no protege nada**. Si en Supabase activas el CAPTCHA con
-un secreto real pero dejas la llave de prueba en el código, **nadie va a
-poder entrar ni registrarse** (Supabase rechaza el token de prueba).
-Cambia las dos cosas juntas.
+El código ya trae la site key del widget `cocoycuero`
+(`0x4AAAAAAFxMSyW4m0gHngeW`). Hasta que pegues el secreto en Supabase
+(paso 3), el widget aparece pero Supabase no lo exige: **no protege
+nada**. Y si algún día cambias el widget en Cloudflare, cambia las dos
+llaves juntas; con una site key y un secreto que no son pareja, **nadie
+puede entrar ni registrarse**.
 
 > Si quieres apagar el CAPTCHA temporalmente (por ejemplo para una demo
 > local), pon `TURNSTILE_SITE_KEY = ""` **y** desactiva *Enable Captcha
@@ -285,7 +285,6 @@ en la prueba.
 | **El sitio público no tiene CSP** | Google Tag Manager inyecta scripts en caliente y una CSP estricta lo rompería; necesita nonces o `'unsafe-inline'` | Empezar con `Content-Security-Policy-Report-Only` y ajustar |
 | **Login y registro no tienen límite por IP** | Supabase solo limita correos por hora e inicios anónimos; el navegador habla directo con `*.supabase.co`, así que Cloudflare tampoco los ve | Turnstile es la barrera. Alternativa mayor: enrutar `/auth/*` por el Worker y poner ahí una regla de rate limiting de Cloudflare |
 | **Lista de correos desechables es manual** | Son ~60 dominios comunes; aparecen nuevos cada semana | Agregar con `insert into privado.dominio_desechable values ('x.com')` cuando veas uno |
-| **La llave de prueba de Turnstile viene en el código** | Para que el sitio funcione aunque no hayas configurado nada | Cambiarla (§3.1). No publiques a producción sin hacerlo |
 | **Sesiones persisten en `localStorage`** | Es el comportamiento estándar de supabase-js; en una computadora compartida la sesión queda abierta | Usar "Salir" en el panel; pedir una sesión más corta en Supabase → Auth → Sessions (*Time-box user sessions*) |
 | **No hay registro de auditoría de acciones del admin** | Solo hay historial de estados de pedido | Tabla `auditoria` con trigger en perfume/presentacion/costo si algún día hay más de un admin |
 
