@@ -37,14 +37,18 @@ insert into _p select 8,'telefono normalizado','3312345678',telefono from public
 do $$
 declare v bigint; r text; total bigint; datos jsonb; costo0 numeric; pres bigint; mio bigint; i int;
 begin
-  select count(*) into total from public.perfume;
+  -- lo que el visitante debe ver: solo lo publicado (en producción
+  -- puede haber perfumes dados de baja, así que no se asume que todos lo estén)
+  select count(*) into total from public.perfume where publicado;
+  select count(*) into i from public.presentacion pr
+    join public.perfume pe on pe.id = pr.perfume_id where pe.publicado;
 
   -- ===== VISITANTE SIN CUENTA =====
   set local role anon;
   select count(*) into v from public.perfume;
   reset role; insert into _p values (1,'anon ve catalogo', total::text, v::text); set local role anon;
   select count(*) into v from public.presentacion;
-  reset role; insert into _p values (2,'anon ve precios', total::text, v::text); set local role anon;
+  reset role; insert into _p values (2,'anon ve precios', i::text, v::text); set local role anon;
   begin select count(*) into v from public.costo_proveedor; r := v::text;
   exception when insufficient_privilege then r := 'bloqueado'; end;
   reset role; insert into _p values (3,'anon lee costos','bloqueado',r); set local role anon;
@@ -85,12 +89,15 @@ begin
   reset role; insert into _p values (18,'Beto ve su pedido','1',v::text);
 
   -- ===== JORGE, ADMINISTRADOR =====
+  -- el admin ve TODO, publicado o no
+  select count(*) into total from public.perfume;
+  select count(*) into i from public.presentacion;
   perform set_config('request.jwt.claims','{"sub":"cccccccc-0000-0000-0000-000000000003","role":"authenticated"}', true);
   set local role authenticated;
-  select count(*) into v from public.costo_proveedor;
-  reset role; insert into _p values (19,'Admin ve costos', total::text, v::text); set local role authenticated;
+  select count(*) into v from public.costo_proveedor where costo is not null;
+  reset role; insert into _p values (19,'Admin ve costos', (select count(*) from public.costo_proveedor)::text, v::text); set local role authenticated;
   select count(*) into v from public.margen_actual where costo is not null;
-  reset role; insert into _p values (20,'Admin ve margen con costo', total::text, v::text); set local role authenticated;
+  reset role; insert into _p values (20,'Admin ve margen con costo', (select count(*) from public.margen_actual where costo is not null)::text, v::text); set local role authenticated;
   begin update public.pedido set estado='entregado'; r := 'PASO DIRECTO';
   exception when raise_exception then r := 'bloqueado'; end;
   reset role; insert into _p values (21,'Pedido consultado a entregado','bloqueado',r); set local role authenticated;
@@ -102,8 +109,9 @@ begin
         r := 'VENDIO CON PERDIDA';
   exception when raise_exception then r := 'bloqueado'; set constraints all deferred; end;
   reset role; insert into _p values (22,'Precio bajo el costo','bloqueado',r); set local role authenticated;
+  select count(*) into i from public.perfume where publicado;
   update public.perfume set publicado = false
-   where id = (select id from public.perfume order by id limit 1);
+   where id = (select min(id) from public.perfume where publicado);
   get diagnostics v = row_count;
   reset role; insert into _p values (23,'Admin da de baja un perfume','1',v::text); set local role authenticated;
   select count(*) into v from public.perfume;
@@ -112,7 +120,7 @@ begin
   -- ===== VISITANTE, TRAS LA BAJA =====
   set local role anon;
   select count(*) into v from public.perfume;
-  reset role; insert into _p values (25,'anon ya no ve el dado de baja', (total - 1)::text, v::text);
+  reset role; insert into _p values (25,'anon ya no ve el dado de baja', (i - 1)::text, v::text);
 
   -- =============================================================
   -- Incremento 2 · funciones del panel y fotos

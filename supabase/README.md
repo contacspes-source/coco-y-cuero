@@ -69,7 +69,7 @@ Es a propósito que no se pueda hacer desde la aplicación: ni tú ni nadie pued
 
 ## Pruebas
 
-Pega `pruebas/seguridad.sql` completo en el SQL Editor y ejecútalo. Corre dentro de una transacción que se revierte, así que no deja datos.
+Pega `pruebas/seguridad.sql` completo en el SQL Editor y ejecútalo. Corre dentro de una transacción que se revierte, así que no deja datos. Si el editor web responde `relation "_p" does not exist`, está partiendo el archivo en varias conexiones; en ese caso córrelo con `psql` o pídele a Claude que lo corra por ti (lo hace en una sola transacción).
 
 **Resultado esperado: 74 de 74 en OK** (la numeración salta del 8 al 11). Si alguna dice FALLA, no publiques el cambio.
 
