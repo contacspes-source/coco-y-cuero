@@ -39,6 +39,7 @@ supabase/
 | 012_presentacion_en_catalogo | La vista pública incluye el id de cada tamaño (lo necesita "Apartar") |
 | 013_bienvenida_y_envio | 10 % en la primera compra (lo calcula la base, redondeado a decenas y nunca bajo el costo) y dirección de envío por pedido |
 | 014_reportes | Costo real por pedido (`pedido_costo`, solo admin), función `reporte_ventas` y se quita TRUNCATE/TRIGGER/REFERENCES a los roles públicos |
+| 015_endurecimiento_registro | Topes de longitud en lo que escribe el cliente, metadatos recortados al registrarse, lista de correos desechables (`privado.dominio_desechable`) y hook `hook_antes_de_crear_usuario` para Supabase Auth (activar en Authentication → Hooks; ver `docs/SEGURIDAD.md`) |
 
 La 003, la 006 y la 009 corrigen errores de las anteriores. Se dejan así a propósito: una migración ya aplicada no se edita, se corrige con otra nueva. Así el historial cuenta lo que realmente pasó.
 
@@ -70,17 +71,17 @@ Es a propósito que no se pueda hacer desde la aplicación: ni tú ni nadie pued
 
 Pega `pruebas/seguridad.sql` completo en el SQL Editor y ejecútalo. Corre dentro de una transacción que se revierte, así que no deja datos.
 
-**Resultado esperado: 66 de 66 en OK.** Si alguna dice FALLA, no publiques el cambio.
+**Resultado esperado: 74 de 74 en OK** (la numeración salta del 8 al 11). Si alguna dice FALLA, no publiques el cambio.
 
 ## Números
 
 | | |
 | --- | --- |
-| Tablas propias | 13 |
+| Tablas propias | 16 |
 | Perfumes cargados | 53 |
 | Precios por debajo del costo | 0 |
 | Margen promedio sobre costo real | 47% |
-| Pruebas de seguridad | 66 de 66 |
+| Pruebas de seguridad | 74 de 74 |
 | Avisos de seguridad de Supabase | 0 |
 
 ## Avisos del auditor que se aceptan a propósito

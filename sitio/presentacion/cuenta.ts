@@ -2,6 +2,7 @@
  * Pantallas de la cuenta del cliente dentro de la hoja lateral:
  * entrar, crear cuenta, recuperar contraseña, Mi cuenta y Apartar.
  */
+import { montarCaptcha } from "../../compartido/captcha";
 import { avisar, campo, conBotonOcupado, h, marcarErrores, vaciar } from "../../compartido/dom";
 import { urlDeFoto } from "../../compartido/texto";
 import type { PerfumePublico } from "../../compartido/tipos";
@@ -279,6 +280,18 @@ export function abrirEntrar(continuar?: () => void, aviso?: string) {
   const clave = h("input", { type: "password", autocomplete: "current-password", required: true });
   const error = errorGeneral();
   const boton = h("button", { clase: "boton boton-oscuro boton-ancho", type: "submit" }, "Entrar");
+  const cajaCaptcha = h("div", { clase: "captcha" });
+  const captcha = montarCaptcha(cajaCaptcha);
+  // cada token de Turnstile sirve una sola vez: tras cada intento se pide otro
+  const conCaptcha = (texto: string, tarea: (token: string) => Promise<void>) =>
+    manejar(form, error, boton, texto, async () => {
+      const token = await captcha.token();
+      try {
+        await tarea(token);
+      } finally {
+        captcha.reiniciar();
+      }
+    });
   const form: HTMLFormElement = h(
     "form",
     {
@@ -287,9 +300,9 @@ export function abrirEntrar(continuar?: () => void, aviso?: string) {
       al: {
         submit: (e) => {
           e.preventDefault();
-          void manejar(form, error, boton, "Entrando…", async () => {
+          void conCaptcha("Entrando…", async (token) => {
             await prepararSesion();
-            await cuenta.entrar(correoIn.value, clave.value);
+            await cuenta.entrar(correoIn.value, clave.value, token);
             await refrescarSesion();
             if (continuar) continuar();
             else abrirMiCuenta();
@@ -299,6 +312,7 @@ export function abrirEntrar(continuar?: () => void, aviso?: string) {
     },
     campo("Correo", correoIn, { nombre: "correo" }),
     campo("Contraseña", clave, { nombre: "contrasena" }),
+    cajaCaptcha,
     error,
     boton,
     h(
@@ -308,10 +322,10 @@ export function abrirEntrar(continuar?: () => void, aviso?: string) {
         clase: "enlace",
         al: {
           click: () =>
-            void manejar(form, error, boton, "Entrar", async () => {
+            void conCaptcha("Entrar", async (token) => {
               await prepararSesion();
-              await cuenta.recuperar(correoIn.value, volverAqui());
-              avisar("Te mandamos un correo para crear una contraseña nueva.", "exito");
+              await cuenta.recuperar(correoIn.value, volverAqui(), token);
+              avisar("Si ese correo tiene cuenta, te mandamos un enlace para crear una contraseña nueva.", "exito");
             }),
         },
       },
@@ -353,6 +367,8 @@ export async function abrirRegistro(continuar?: () => void) {
   const acepta = h("input", { type: "checkbox" });
   const error = errorGeneral();
   const boton = h("button", { clase: "boton boton-oscuro boton-ancho", type: "submit" }, "Crear mi cuenta");
+  const cajaCaptcha = h("div", { clase: "captcha" });
+  const captcha = montarCaptcha(cajaCaptcha);
 
   const form: HTMLFormElement = h(
     "form",
@@ -363,19 +379,27 @@ export async function abrirRegistro(continuar?: () => void) {
         submit: (e) => {
           e.preventDefault();
           void manejar(form, error, boton, "Creando…", async () => {
-            const r = await cuenta.registrar(
-              {
-                nombre: nombre.value,
-                telefono: telefono.value,
-                correo: correoIn.value,
-                contrasena: clave.value,
-                ciudad: ciudad.value,
-                direccion: direccion.leer(),
-                canal: canal.value,
-                aceptaTerminos: acepta.checked,
-              },
-              volverAqui(),
-            );
+            const token = await captcha.token();
+            let r: { requiereConfirmacion: boolean };
+            try {
+              r = await cuenta.registrar(
+                {
+                  nombre: nombre.value,
+                  telefono: telefono.value,
+                  correo: correoIn.value,
+                  contrasena: clave.value,
+                  ciudad: ciudad.value,
+                  direccion: direccion.leer(),
+                  canal: canal.value,
+                  aceptaTerminos: acepta.checked,
+                },
+                volverAqui(),
+                token,
+              );
+            } catch (e) {
+              captcha.reiniciar();
+              throw e;
+            }
             if (r.requiereConfirmacion) {
               hoja.pintar(
                 ...encabezado("Revisa tu correo", `Te mandamos un enlace a ${correoIn.value.trim()} para confirmar tu cuenta. Ábrelo desde este mismo teléfono o computadora.`),
@@ -415,6 +439,7 @@ export async function abrirRegistro(continuar?: () => void) {
       ),
       h("p", { clase: "campo-error", role: "alert" }),
     ),
+    cajaCaptcha,
     error,
     boton,
     h("p", { clase: "cta-nota" }, "Usamos tus datos solo para tus pedidos. Nunca los compartimos."),

@@ -230,8 +230,8 @@ describe("ServicioCuenta", () => {
     sesionActual: async () => null,
     descuentoBienvenida: async () => 0.1,
     actualizarNombreDeSesion: async () => {},
-    registrar: async (d: DatosDeRegistro) => (llamadas.push(["registrar", d]), { requiereConfirmacion: true }),
-    entrar: async () => {},
+    registrar: async (d: DatosDeRegistro, _v: string, captcha: string) => (llamadas.push(["registrar", d, captcha]), { requiereConfirmacion: true }),
+    entrar: async (...a: unknown[]) => void llamadas.push(["entrar", ...a]),
     salir: async () => {},
     recuperar: async () => {},
     cambiarContrasena: async () => {},
@@ -246,13 +246,42 @@ describe("ServicioCuenta", () => {
   const s = new ServicioCuenta(repo);
 
   test("un registro inválido no llega al servidor", async () => {
-    await expect(s.registrar(registro({ telefono: "123" }), "/")).rejects.toBeInstanceOf(ErrorDeValidacion);
+    await expect(s.registrar(registro({ telefono: "123" }), "/", "tok")).rejects.toBeInstanceOf(ErrorDeValidacion);
     expect(llamadas).toEqual([]);
   });
 
   test("el registro viaja limpio", async () => {
-    await s.registrar(registro({ correo: " Ana@Correo.MX ", telefono: "+52 33 1234 5678", nombre: " Ana   Martínez " }), "/");
+    await s.registrar(registro({ correo: " Ana@Correo.MX ", telefono: "+52 33 1234 5678", nombre: " Ana   Martínez " }), "/", "tok");
     expect(llamadas.at(-1)![1]).toMatchObject({ correo: "ana@correo.mx", telefono: "3312345678", nombre: "Ana Martínez" });
+  });
+
+  test("el token del CAPTCHA llega al repositorio en registro y login", async () => {
+    await s.registrar(registro({}), "/", "token-turnstile");
+    expect(llamadas.at(-1)![2]).toBe("token-turnstile");
+    await s.entrar("ana@correo.mx", "clave123", "otro-token");
+    expect(llamadas.at(-1)).toEqual(["entrar", "ana@correo.mx", "clave123", "otro-token"]);
+  });
+
+  test("nombre o correo absurdamente largos no llegan al servidor", async () => {
+    const antes = llamadas.length;
+    await expect(s.registrar(registro({ nombre: "a".repeat(121) }), "/", "tok")).rejects.toBeInstanceOf(ErrorDeValidacion);
+    await expect(s.registrar(registro({ correo: `${"a".repeat(250)}@x.mx` }), "/", "tok")).rejects.toBeInstanceOf(ErrorDeValidacion);
+    expect(llamadas.length).toBe(antes);
+  });
+
+  test("notas del pedido de más de 500 caracteres se rechazan antes de enviar", async () => {
+    const antes = llamadas.length;
+    await expect(s.apartar(5, "Guadalajara", "x".repeat(501))).rejects.toBeInstanceOf(ErrorDeValidacion);
+    expect(llamadas.length).toBe(antes);
+    await s.apartar(5, "Guadalajara", "x".repeat(500));
+    expect(llamadas.length).toBe(antes + 1);
+  });
+
+  test("cambiar contraseña exige letras y números, como el registro", async () => {
+    await expect(s.cambiarContrasena("12345678", "12345678")).rejects.toBeInstanceOf(ErrorDeValidacion);
+    await expect(s.cambiarContrasena("abcdefgh", "abcdefgh")).rejects.toBeInstanceOf(ErrorDeValidacion);
+    await expect(s.cambiarContrasena("a".repeat(70) + "123", "a".repeat(70) + "123")).rejects.toBeInstanceOf(ErrorDeValidacion);
+    await expect(s.cambiarContrasena("clave1234", "clave1234")).resolves.toBeUndefined();
   });
 
   test("apartar sin id de presentación (respaldo viejo) pide WhatsApp", async () => {
@@ -276,9 +305,9 @@ describe("ServicioCuenta", () => {
   });
 
   test("el registro local no manda dirección y el de envío sí", async () => {
-    await s.registrar(registro({ direccion: puebla }), "/");
+    await s.registrar(registro({ direccion: puebla }), "/", "tok");
     expect((llamadas.at(-1)![1] as DatosDeRegistro).direccion).toBe("");
-    await s.registrar(registro({ ciudad: OTRA_CIUDAD, direccion: puebla }), "/");
+    await s.registrar(registro({ ciudad: OTRA_CIUDAD, direccion: puebla }), "/", "tok");
     expect((llamadas.at(-1)![1] as DatosDeRegistro).direccion).toBe(componerDireccion(puebla));
   });
 });

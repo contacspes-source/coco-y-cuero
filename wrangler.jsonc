@@ -5,6 +5,10 @@
   // todo lo demás lo sirve Cloudflare directo desde dist/ sin ejecutarlo.
   // Código fuente, migraciones y pruebas nunca llegan al servidor.
   "main": "worker/index.ts",
+  // Cloudflare crea una vista previa por cada rama/PR con `wrangler preview`;
+  // ese comando exige este bloque aunque vaya vacío. La configuración de
+  // assets de abajo aplica igual a las vistas previas.
+  "previews": {},
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",

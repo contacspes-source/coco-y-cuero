@@ -645,3 +645,7 @@ form.panel .campos-3 { margin-top: 0; }
   0%, 30% { background: var(--justo-fondo); box-shadow: 0 0 0 2px var(--caramelo); }
   100% { box-shadow: 0 0 0 0 transparent; }
 }
+
+/* widget de Turnstile (CAPTCHA) en el login; vacío cuando está apagado */
+.captcha:empty{display:none}
+.captcha{min-height:65px;display:flex;justify-content:center}

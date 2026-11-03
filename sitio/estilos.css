@@ -410,6 +410,9 @@ html.con-hoja{overflow:hidden}
 .cta-titulo{font-size:34px;margin:0 0 8px}
 .cta-texto{margin:0 0 20px;color:var(--tinta-suave);font-size:14.5px}
 .cta-form{display:flex;flex-direction:column;gap:14px;margin:6px 0 20px}
+/* widget de Turnstile (CAPTCHA); vacío cuando está apagado */
+.captcha:empty{display:none}
+.captcha{min-height:65px;display:flex;justify-content:center}
 .cta-dos{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .campo{display:flex;flex-direction:column;gap:5px;min-width:0}
 .campo label{font-size:12.5px;letter-spacing:.06em;color:var(--tinta-suave)}

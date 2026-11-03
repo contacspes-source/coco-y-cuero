@@ -40,9 +40,10 @@ export type EventoDeSesion = "entro" | "salio" | "recuperar-contrasena";
 export interface RepositorioSesion {
   usuarioActual(): Promise<Usuario | null>;
   rolDe(usuario: Usuario): Promise<Rol | null>;
-  iniciarSesion(correo: string, contrasena: string): Promise<Usuario>;
+  /** `captcha`: token de Turnstile; Supabase rechaza la llamada sin él. */
+  iniciarSesion(correo: string, contrasena: string, captcha: string): Promise<Usuario>;
   cerrarSesion(): Promise<void>;
-  enviarCorreoDeRecuperacion(correo: string, volverA: string): Promise<void>;
+  enviarCorreoDeRecuperacion(correo: string, volverA: string, captcha: string): Promise<void>;
   cambiarContrasena(nueva: string): Promise<void>;
   alCambiar(escucha: (evento: EventoDeSesion) => void): void;
 }

@@ -18,7 +18,12 @@ import { DESCUENTO_BIENVENIDA, OTRA_CIUDAD } from "./tienda";
 export { ErrorDeDatos, ErrorDeValidacion };
 export type { DatosDeRegistro, EventoDeCuenta, PedidoPropio, Perfil, ProblemaDeCampo, SesionActual };
 
-export const LARGO_MINIMO_CONTRASENA = 8;
+export { LARGO_MINIMO_CONTRASENA, LARGO_MAXIMO_CONTRASENA, problemaDeContrasena } from "../../compartido/contrasena";
+import { problemaDeContrasena } from "../../compartido/contrasena";
+
+/** Topes que también hace cumplir la base (migración 015). */
+export const LARGO_MAXIMO_NOMBRE = 120;
+export const LARGO_MAXIMO_NOTAS = 500;
 
 /** "+52 (33) 1234-5678" → "3312345678"; null si no son 10 dígitos. */
 export function normalizarTelefono(texto: string): string | null {
@@ -117,13 +122,11 @@ export type FormularioRegistro = Omit<DatosDeRegistro, "direccion"> & {
 export function validarRegistro(d: FormularioRegistro): ProblemaDeCampo[] {
   const p: ProblemaDeCampo[] = [];
   if (d.nombre.trim().length < 3) p.push({ campo: "nombre", mensaje: "Escribe tu nombre completo." });
+  else if (d.nombre.trim().length > LARGO_MAXIMO_NOMBRE) p.push({ campo: "nombre", mensaje: "El nombre es demasiado largo." });
   if (!normalizarTelefono(d.telefono)) p.push({ campo: "telefono", mensaje: "Tu WhatsApp a 10 dígitos." });
-  if (!CORREO.test(d.correo.trim())) p.push({ campo: "correo", mensaje: "Revisa tu correo." });
-  if (d.contrasena.length < LARGO_MINIMO_CONTRASENA) {
-    p.push({ campo: "contrasena", mensaje: `Usa al menos ${LARGO_MINIMO_CONTRASENA} caracteres.` });
-  } else if (!/\d/.test(d.contrasena) || !/[a-zA-Z]/.test(d.contrasena)) {
-    p.push({ campo: "contrasena", mensaje: "Combina letras y números." });
-  }
+  if (!CORREO.test(d.correo.trim()) || d.correo.trim().length > 254) p.push({ campo: "correo", mensaje: "Revisa tu correo." });
+  const clave = problemaDeContrasena(d.contrasena);
+  if (clave) p.push({ campo: "contrasena", mensaje: clave });
   if (!d.ciudad) p.push({ campo: "ciudad", mensaje: "Elige tu ciudad." });
   if (requiereDireccion(d.ciudad)) p.push(...validarDireccion(d.direccion));
   if (!d.aceptaTerminos) p.push({ campo: "terminos", mensaje: "Acepta los términos para crear tu cuenta." });
@@ -141,6 +144,7 @@ export interface FormularioPerfil {
 export function validarPerfil(p: Pick<FormularioPerfil, "nombre" | "telefono"> & Partial<FormularioPerfil>): ProblemaDeCampo[] {
   const r: ProblemaDeCampo[] = [];
   if (p.nombre.trim().length < 3) r.push({ campo: "nombre", mensaje: "Escribe tu nombre completo." });
+  else if (p.nombre.trim().length > LARGO_MAXIMO_NOMBRE) r.push({ campo: "nombre", mensaje: "El nombre es demasiado largo." });
   if (!normalizarTelefono(p.telefono)) r.push({ campo: "telefono", mensaje: "Tu WhatsApp a 10 dígitos." });
   if (p.direccion && requiereDireccion(p.ciudad ?? null)) r.push(...validarDireccion(p.direccion));
   return r;
@@ -237,7 +241,12 @@ export class ServicioCuenta {
   salir = () => this.repo.salir();
   alCambiar = (e: (x: EventoDeCuenta) => void) => this.repo.alCambiar(e);
 
-  async registrar(d: FormularioRegistro, volverA: string) {
+  /**
+   * `captcha`: token de Turnstile que entrega la pantalla. Se valida
+   * aquí que exista (si el CAPTCHA está activo) para no gastar una
+   * llamada a la red que Supabase va a rechazar de todas formas.
+   */
+  async registrar(d: FormularioRegistro, volverA: string, captcha: string) {
     const problemas = validarRegistro(d);
     if (problemas.length) throw new ErrorDeValidacion(problemas);
     return this.repo.registrar(
@@ -251,27 +260,27 @@ export class ServicioCuenta {
         direccion: requiereDireccion(d.ciudad) ? componerDireccion(d.direccion) : "",
       },
       volverA,
+      captcha,
     );
   }
 
-  async entrar(correo: string, contrasena: string) {
+  async entrar(correo: string, contrasena: string, captcha: string) {
     if (!CORREO.test(correo.trim()) || !contrasena) {
       throw new ErrorDeValidacion([{ campo: "correo", mensaje: "Escribe tu correo y contraseña." }]);
     }
-    return this.repo.entrar(correo.trim().toLowerCase(), contrasena);
+    return this.repo.entrar(correo.trim().toLowerCase(), contrasena, captcha);
   }
 
-  async recuperar(correo: string, volverA: string) {
+  async recuperar(correo: string, volverA: string, captcha: string) {
     if (!CORREO.test(correo.trim())) {
       throw new ErrorDeValidacion([{ campo: "correo", mensaje: "Escribe tu correo para mandarte el enlace." }]);
     }
-    return this.repo.recuperar(correo.trim().toLowerCase(), volverA);
+    return this.repo.recuperar(correo.trim().toLowerCase(), volverA, captcha);
   }
 
   async cambiarContrasena(nueva: string, confirmacion: string) {
-    if (nueva.length < LARGO_MINIMO_CONTRASENA) {
-      throw new ErrorDeValidacion([{ campo: "contrasena", mensaje: `Usa al menos ${LARGO_MINIMO_CONTRASENA} caracteres.` }]);
-    }
+    const problema = problemaDeContrasena(nueva);
+    if (problema) throw new ErrorDeValidacion([{ campo: "contrasena", mensaje: problema }]);
     if (nueva !== confirmacion) throw new ErrorDeValidacion([{ campo: "confirmacion", mensaje: "No coinciden." }]);
     return this.repo.cambiarContrasena(nueva);
   }
@@ -302,7 +311,11 @@ export class ServicioCuenta {
       if (problemas.length) throw new ErrorDeValidacion(problemas);
       envio = componerDireccion(direccion!);
     }
-    return this.repo.solicitar(presentacionId, ciudad, notas.trim() || null, envio);
+    const nota = notas.trim();
+    if (nota.length > LARGO_MAXIMO_NOTAS) {
+      throw new ErrorDeValidacion([{ campo: "notas", mensaje: `Acorta tus notas a ${LARGO_MAXIMO_NOTAS} caracteres.` }]);
+    }
+    return this.repo.solicitar(presentacionId, ciudad, nota || null, envio);
   }
 
   cancelar(pedidoId: number) {

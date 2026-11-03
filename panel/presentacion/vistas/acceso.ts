@@ -1,4 +1,5 @@
 /** Pantallas de acceso: iniciar sesión, recuperar y cambiar contraseña. */
+import { montarCaptcha } from "../../../compartido/captcha";
 import { ErrorDeValidacion, mensajeDe } from "../../negocio/errores";
 import { LARGO_MINIMO_CONTRASENA } from "../../negocio/servicios";
 import { servicios } from "../estado";
@@ -25,6 +26,10 @@ export function vistaLogin(alEntrar: (correo: string) => void): HTMLElement {
   const contrasena = h("input", { type: "password", autocomplete: "current-password", required: true });
   const error = h("p", { clase: "acceso-error", role: "alert" });
   const boton = h("button", { clase: "boton boton-primario boton-ancho", type: "submit" }, "Entrar");
+  // CAPTCHA: frena a quien intente adivinar la contraseña con un script.
+  // Cada token sirve una sola vez, así que se reinicia tras cada intento.
+  const cajaCaptcha = h("div", { clase: "captcha" });
+  const captcha = montarCaptcha(cajaCaptcha);
 
   const formulario = h(
     "form",
@@ -35,9 +40,14 @@ export function vistaLogin(alEntrar: (correo: string) => void): HTMLElement {
           e.preventDefault();
           error.textContent = "";
           try {
-            const quien = await conBotonOcupado(boton, "Entrando…", () =>
-              servicios.sesion.entrar(correo.value, contrasena.value),
-            );
+            const quien = await conBotonOcupado(boton, "Entrando…", async () => {
+              const token = await captcha.token();
+              try {
+                return await servicios.sesion.entrar(correo.value, contrasena.value, token);
+              } finally {
+                captcha.reiniciar();
+              }
+            });
             alEntrar(quien);
           } catch (err) {
             error.textContent = mensajeDe(err);
@@ -48,6 +58,7 @@ export function vistaLogin(alEntrar: (correo: string) => void): HTMLElement {
     },
     campo("Correo", correo),
     campo("Contraseña", contrasena),
+    cajaCaptcha,
     error,
     boton,
     h(
@@ -63,8 +74,13 @@ export function vistaLogin(alEntrar: (correo: string) => void): HTMLElement {
               return;
             }
             try {
-              await servicios.sesion.recuperar(correo.value, `${location.origin}/panel/`);
-              avisar("Te mandamos un correo con un enlace para crear una contraseña nueva.", "exito");
+              const token = await captcha.token();
+              try {
+                await servicios.sesion.recuperar(correo.value, `${location.origin}/panel/`, token);
+              } finally {
+                captcha.reiniciar();
+              }
+              avisar("Si ese correo es de un administrador, le mandamos un enlace para crear una contraseña nueva.", "exito");
             } catch (err) {
               error.textContent = mensajeDe(err);
             }
@@ -104,7 +120,7 @@ export function vistaNuevaContrasena(alTerminar: () => void): HTMLElement {
         },
       },
     },
-    campo("Contraseña nueva", nueva, { nombre: "contrasena", ayuda: `Al menos ${LARGO_MINIMO_CONTRASENA} caracteres.` }),
+    campo("Contraseña nueva", nueva, { nombre: "contrasena", ayuda: `Al menos ${LARGO_MINIMO_CONTRASENA} caracteres, con letras y números.` }),
     campo("Repítela", confirmacion, { nombre: "confirmacion" }),
     boton,
   );
