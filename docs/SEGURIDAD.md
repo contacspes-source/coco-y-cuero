@@ -112,7 +112,7 @@ puede entrar ni registrarse**.
 | **Providers → Email → Confirm email** | Activado | Sin confirmar, cualquiera registra correos ajenos |
 | **Providers → Email → Minimum password length** | `8` | Igual que el código |
 | **Providers → Email → Password requirements** | *Letters and digits* | Igual que el código |
-| **Attack Protection → Leaked password protection** | Activado | Rechaza contraseñas que ya aparecieron en filtraciones (HaveIBeenPwned). Protege sobre todo tu cuenta de admin |
+| **Providers → Email → Prevent use of leaked passwords** | Solo en plan Pro; en el plan gratis Supabase no deja activarlo | Rechazaría contraseñas que ya aparecieron en filtraciones (HaveIBeenPwned). Mientras no se tenga, la compensación es una contraseña de admin larga y única (§3.5) |
 | **Attack Protection → Enable Captcha protection** | Turnstile + secreto (§3.1) | Frena registro masivo y fuerza bruta |
 | **Rate Limits** | Revisa que *Emails sent per hour* no sea más alto de lo que necesitas (30/h con SMTP propio está bien). Ojo: Supabase **no** limita por IP el registro ni el login con correo y contraseña; solo limita cuántos correos manda por hora y los inicios anónimos | Es la segunda barrera para el registro masivo (cada registro manda un correo). Para el login, la única barrera es el CAPTCHA |
 | **URL Configuration → Site URL** | `https://cocoycuero.com` | A dónde vuelven los enlaces de correo |
@@ -281,6 +281,7 @@ en la prueba.
 
 | Límite | Por qué | Qué haría falta |
 | --- | --- | --- |
+| **Sin protección contra contraseñas filtradas** | Es función de plan Pro de Supabase | Subir de plan, o una contraseña de admin larga y única (§3.5) |
 | **Sin MFA en el panel** | Supabase lo soporta (TOTP) pero la pantalla de enrolar/verificar no está hecha | ~100 líneas en `panel/`: enrolar con QR al primer login de admin y pedir el código en cada login. Es el siguiente paso recomendado |
 | **El sitio público no tiene CSP** | Google Tag Manager inyecta scripts en caliente y una CSP estricta lo rompería; necesita nonces o `'unsafe-inline'` | Empezar con `Content-Security-Policy-Report-Only` y ajustar |
 | **Login y registro no tienen límite por IP** | Supabase solo limita correos por hora e inicios anónimos; el navegador habla directo con `*.supabase.co`, así que Cloudflare tampoco los ve | Turnstile es la barrera. Alternativa mayor: enrutar `/auth/*` por el Worker y poner ahí una regla de rate limiting de Cloudflare |
