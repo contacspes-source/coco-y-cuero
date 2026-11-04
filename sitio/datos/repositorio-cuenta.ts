@@ -14,6 +14,8 @@ export interface DatosDeRegistro {
   direccion: string;
   ciudad: string;
   canal: string;
+  /** Solo cuando canal = "Otro": dónde o con quién. */
+  canalDetalle: string;
 }
 
 export interface Perfil {
@@ -24,6 +26,8 @@ export interface Perfil {
   ciudad: string | null;
   canalId: number | null;
   correo: string;
+  /** false = la cuenta fue dada de baja por la tienda. */
+  activo: boolean;
 }
 
 export interface SesionActual {
@@ -88,7 +92,14 @@ export class RepositorioCuenta {
       options: {
         emailRedirectTo: volverA,
         captchaToken: captcha || undefined,
-        data: { nombre: d.nombre, telefono: d.telefono, direccion: d.direccion, ciudad: d.ciudad, canal: d.canal },
+        data: {
+          nombre: d.nombre,
+          telefono: d.telefono,
+          direccion: d.direccion,
+          ciudad: d.ciudad,
+          canal: d.canal,
+          canal_detalle: d.canalDetalle || null,
+        },
       },
     });
     if (error) {
@@ -171,7 +182,7 @@ export class RepositorioCuenta {
     const fila = revisar(
       await db
         .from("cliente")
-        .select("numero_cliente, nombre, telefono, direccion, ciudad, canal_id")
+        .select("numero_cliente, nombre, telefono, direccion, ciudad, canal_id, activo")
         .eq("auth_user_id", usuario.id)
         .maybeSingle(),
     ) as {
@@ -181,6 +192,7 @@ export class RepositorioCuenta {
       direccion: string | null;
       ciudad: string | null;
       canal_id: number | null;
+      activo: boolean | null;
     } | null;
     if (!fila) return null;
     return {
@@ -191,6 +203,7 @@ export class RepositorioCuenta {
       ciudad: fila.ciudad,
       canalId: fila.canal_id,
       correo: usuario.email ?? "",
+      activo: fila.activo !== false,
     };
   }
 

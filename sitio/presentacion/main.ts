@@ -519,4 +519,10 @@ new IntersectionObserver(([e]) => { filtrosVisibles = e!.isIntersecting; actuali
 new IntersectionObserver(([e]) => { rejillaVisible = e!.isIntersecting; actualizarBarra(); }, { rootMargin: "0px 0px -40% 0px" }).observe(rejilla);
 
 // ------------------------------------------------------------ cuenta
-void iniciarCuenta($<HTMLButtonElement>("cuenta-boton"), document.getElementById("promo"), conviene.cargarCuentaAlInicio(), () => portada.refrescar());
+void iniciarCuenta(
+  $<HTMLButtonElement>("cuenta-boton"),
+  document.getElementById("cuenta-crear") as HTMLButtonElement | null,
+  document.getElementById("promo"),
+  conviene.cargarCuentaAlInicio(),
+  () => portada.refrescar(),
+);

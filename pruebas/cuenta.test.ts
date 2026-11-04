@@ -100,18 +100,6 @@ describe("detalle del perfume", () => {
 // ------------------------------------------------------------------
 // Cuenta del cliente
 // ------------------------------------------------------------------
-const registro = (d: Partial<FormularioRegistro> = {}): FormularioRegistro => ({
-  nombre: "Ana Martínez",
-  telefono: "33 1234 5678",
-  correo: "ana@correo.mx",
-  contrasena: "perfume2026",
-  ciudad: "Zamora",
-  direccion: { ...DIRECCION_VACIA },
-  canal: "Instagram",
-  aceptaTerminos: true,
-  ...d,
-});
-const campos = (d: FormularioRegistro) => validarRegistro(d).map((x) => x.campo);
 const puebla: Direccion = {
   calle: "Av. Juárez 120 int. 3",
   colonia: "Centro",
@@ -120,22 +108,46 @@ const puebla: Direccion = {
   estado: "Puebla",
   referencias: "Portón negro",
 };
+const registro = (d: Partial<FormularioRegistro> = {}): FormularioRegistro => ({
+  nombre: "Ana Martínez",
+  telefono: "33 1234 5678",
+  correo: "ana@correo.mx",
+  contrasena: "perfume2026",
+  ciudad: "Zamora",
+  direccion: { ...puebla },
+  canal: "Instagram",
+  canalDetalle: "",
+  aceptaTerminos: true,
+  ...d,
+});
+const campos = (d: FormularioRegistro) => validarRegistro(d).map((x) => x.campo);
 
 describe("registro", () => {
   test("datos completos", () => expect(campos(registro())).toEqual([]));
-  test("todo vacío señala cada campo", () =>
-    expect(campos(registro({ nombre: "", telefono: "", correo: "", contrasena: "", ciudad: "" }))).toEqual([
+  test("todo vacío señala cada campo, dirección y canal incluidos", () =>
+    expect(campos(registro({ nombre: "", telefono: "", correo: "", contrasena: "", ciudad: "", direccion: { ...DIRECCION_VACIA }, canal: "" }))).toEqual([
       "nombre",
       "telefono",
       "correo",
       "contrasena",
       "ciudad",
+      "calle",
+      "colonia",
+      "cp",
+      "municipio",
+      "estado",
+      "canal",
     ]));
   test("sin aceptar términos no se crea", () => expect(campos(registro({ aceptaTerminos: false }))).toEqual(["terminos"]));
-  test("en las tres ciudades no se pide dirección", () => expect(campos(registro({ ciudad: "Morelia" }))).toEqual([]));
-  test("envío a otra ciudad exige dirección completa", () =>
-    expect(campos(registro({ ciudad: OTRA_CIUDAD }))).toEqual(["calle", "colonia", "cp", "municipio", "estado"]));
+  test("la dirección es obligatoria también en las tres ciudades", () =>
+    expect(campos(registro({ ciudad: "Morelia", direccion: { ...DIRECCION_VACIA } }))).toEqual(["calle", "colonia", "cp", "municipio", "estado"]));
   test("envío con dirección completa", () => expect(campos(registro({ ciudad: OTRA_CIUDAD, direccion: puebla }))).toEqual([]));
+  test("canal Otro exige decir cuál", () => {
+    expect(campos(registro({ canal: "Otro" }))).toEqual(["canalDetalle"]);
+    expect(campos(registro({ canal: "Otro", canalDetalle: "x" }))).toEqual(["canalDetalle"]);
+    expect(campos(registro({ canal: "Otro", canalDetalle: "Mi prima Laura" }))).toEqual([]);
+    expect(campos(registro({ canal: "Instagram", canalDetalle: "" }))).toEqual([]);
+  });
   test("código postal de 4 dígitos", () => expect(validarDireccion({ ...puebla, cp: "7200" }).map((x) => x.campo)).toEqual(["cp"]));
   test("contraseña solo con letras", () => expect(campos(registro({ contrasena: "perfumesss" }))).toEqual(["contrasena"]));
   test("correo sin dominio", () => expect(campos(registro({ correo: "ana@correo" }))).toEqual(["correo"]));
@@ -304,10 +316,11 @@ describe("ServicioCuenta", () => {
     expect(llamadas.at(-1)).toEqual(["solicitar", 10, OTRA_CIUDAD, null, componerDireccion(puebla)]);
   });
 
-  test("el registro local no manda dirección y el de envío sí", async () => {
-    await s.registrar(registro({ direccion: puebla }), "/", "tok");
-    expect((llamadas.at(-1)![1] as DatosDeRegistro).direccion).toBe("");
-    await s.registrar(registro({ ciudad: OTRA_CIUDAD, direccion: puebla }), "/", "tok");
+  test("el registro siempre manda la dirección compuesta; el detalle del canal solo con Otro", async () => {
+    await s.registrar(registro({ direccion: puebla, canal: "Instagram", canalDetalle: "ruido" }), "/", "tok");
     expect((llamadas.at(-1)![1] as DatosDeRegistro).direccion).toBe(componerDireccion(puebla));
+    expect((llamadas.at(-1)![1] as DatosDeRegistro).canalDetalle).toBe("");
+    await s.registrar(registro({ canal: "Otro", canalDetalle: "  una   amiga " }), "/", "tok");
+    expect((llamadas.at(-1)![1] as DatosDeRegistro).canalDetalle).toBe("una amiga");
   });
 });

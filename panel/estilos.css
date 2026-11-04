@@ -162,32 +162,38 @@ input[type="number"] { font-variant-numeric: tabular-nums; }
 .acceso-error { margin: 0; color: var(--bajo); font-size: 13.5px; }
 .acceso-error:empty { display: none; }
 
-/* ---------------------------------------------------------- marco */
-.barra-superior {
-  position: sticky; top: 0; z-index: 20;
-  display: flex; align-items: center; gap: 28px;
-  height: 64px; padding: 0 28px;
-  background: rgba(248, 241, 232, 0.92); backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--linea);
+/* ---------------------------------------------------------- marco: menú lateral */
+#app.con-marco { display: grid; grid-template-columns: 236px minmax(0, 1fr); min-height: 100vh; }
+#app.con-marco > * { min-width: 0; }
+.barra-lateral {
+  position: sticky; top: 0; z-index: 20; align-self: start;
+  display: flex; flex-direction: column; gap: 22px;
+  height: 100vh; padding: 20px 16px 18px;
+  background: var(--papel); border-right: 1px solid var(--linea);
 }
-.marca { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.marca { display: flex; align-items: center; gap: 10px; text-decoration: none; padding: 0 6px; }
+.barra-lateral .marca span { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; white-space: nowrap; line-height: 1.1; }
+.barra-lateral .marca small { margin-left: 0; vertical-align: 0; }
 .marca img { width: 38px; height: 38px; object-fit: contain; }
 .marca span { font-family: var(--display); font-size: 20px; font-weight: 500; letter-spacing: 0.02em; }
 .marca small {
   margin-left: 8px; padding: 2px 8px; border-radius: 999px; background: var(--ebano); color: var(--crema);
   font-family: var(--util); font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; vertical-align: 3px;
 }
-.navegacion { display: flex; gap: 4px; }
+.navegacion { display: flex; flex-direction: column; gap: 2px; }
 .navegacion a {
-  padding: 8px 14px; border-radius: 999px; text-decoration: none;
-  color: var(--tinta-suave); font-weight: 500; font-size: 14px;
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px; border-radius: var(--radio-chico); text-decoration: none;
+  color: var(--tinta-suave); font-weight: 500; font-size: 14.5px;
 }
-.navegacion a:hover { color: var(--cuero); }
+.navegacion a:hover { color: var(--cuero); background: var(--crema); }
 .navegacion a.activo { background: var(--arena); color: var(--ebano); }
-.usuario { margin-left: auto; display: flex; align-items: center; gap: 16px; font-size: 13px; }
+.nav-icono { width: 22px; text-align: center; font-size: 15px; color: var(--caramelo); }
+.navegacion a.activo .nav-icono { color: var(--cuero); }
+.usuario { margin-top: auto; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; font-size: 13px; padding: 14px 6px 0; border-top: 1px solid var(--linea); }
 .ver-sitio { color: var(--tinta-suave); text-decoration: none; }
 .ver-sitio:hover { color: var(--cuero); }
-.usuario-correo { color: var(--tinta-tenue); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.usuario-correo { color: var(--tinta-tenue); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .contenido { max-width: 1180px; margin: 0 auto; padding: 32px 28px 120px; outline: none; }
 .vista-cabecera { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 24px; flex-wrap: wrap; }
@@ -470,9 +476,6 @@ form.panel .campos-3 { margin-top: 0; }
 /* ---------------------------------------------------------- teléfono */
 @media (max-width: 680px) {
   body { font-size: 14.5px; }
-  .barra-superior { flex-wrap: wrap; gap: 0 12px; padding: 8px 16px 0; height: auto; }
-  .barra-superior .marca { height: 44px; }
-  .navegacion { order: 3; width: calc(100% + 32px); margin: 0 -16px; padding: 4px 12px 8px; overflow-x: auto; scrollbar-width: none; border-top: 1px solid var(--linea); }
   .navegacion::-webkit-scrollbar { display: none; }
   .pestanas { flex-wrap: nowrap; overflow-x: auto; width: 100%; scrollbar-width: none; }
   .pestanas::-webkit-scrollbar { display: none; }
@@ -649,3 +652,29 @@ form.panel .campos-3 { margin-top: 0; }
 /* widget de Turnstile (CAPTCHA) en el login; vacío cuando está apagado */
 .captcha:empty{display:none}
 .captcha{min-height:65px;display:flex;justify-content:center}
+
+/* clientes dados de baja */
+.etiqueta-baja { background: var(--bajo); color: #fff; }
+.interruptor-filtro { margin-left: auto; white-space: nowrap; }
+.barra-clientes { grid-template-columns: minmax(220px, 520px) auto; align-items: center; }
+
+/* ---------------------------------------------------------- menú lateral en pantallas chicas: barra arriba */
+@media (max-width: 900px) {
+  #app.con-marco { grid-template-columns: minmax(0, 1fr); }
+  .barra-lateral {
+    height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 0 12px;
+    padding: 8px 16px 0; border-right: 0; border-bottom: 1px solid var(--linea);
+    background: rgba(248, 241, 232, 0.92); backdrop-filter: blur(10px);
+  }
+  .barra-lateral .marca { height: 44px; padding: 0; }
+  .barra-lateral .marca span { flex-direction: row; align-items: center; gap: 8px; }
+  .navegacion { order: 3; flex-direction: row; width: calc(100% + 32px); margin: 0 -16px; padding: 4px 12px 8px; overflow-x: auto; scrollbar-width: none; border-top: 1px solid var(--linea); }
+  .navegacion a { flex: none; padding: 8px 12px; border-radius: 999px; }
+  .nav-icono { display: none; }
+  .usuario { margin: 0 0 0 auto; flex-direction: row; align-items: center; gap: 12px; padding: 0; border: 0; }
+  .usuario-correo { max-width: 160px; }
+}
+@media (max-width: 1020px) {
+  .barra-clientes { grid-template-columns: 1fr; }
+  .interruptor-filtro { margin-left: 0; }
+}

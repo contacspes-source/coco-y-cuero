@@ -121,9 +121,14 @@ export interface ClienteAdmin {
   direccion: string | null;
   ciudad: string | null;
   canal: string | null;
+  /** Solo con canal "Otro": dónde o con quién nos conoció. */
+  canalDetalle: string | null;
   correo: string | null;
   rol: Rol;
   conCuenta: boolean;
+  /** false = dado de baja (baja lógica: conserva pedidos e historial). */
+  activo: boolean;
+  bajaEn: string | null;
   creadoEn: string;
   pedidos: number;
   pedidosActivos: number;

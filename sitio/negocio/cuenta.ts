@@ -62,7 +62,13 @@ export const ESTADOS_DE_MEXICO = [
 export const LARGO_MAXIMO_DIRECCION = 300;
 const SEPARADOR = " · ";
 
+/** Al APARTAR, la dirección solo hace falta para envío a otra ciudad. */
 export const requiereDireccion = (ciudad: string | null) => ciudad === OTRA_CIUDAD;
+
+/** Canal "Otro": el cliente debe decir cuál. */
+export const CANAL_OTRO = "Otro";
+export const LARGO_MAXIMO_CANAL_DETALLE = 80;
+export const requiereDetalleDeCanal = (canal: string) => canal === CANAL_OTRO;
 
 const limpio = (t: string) => t.trim().replace(/\s+/g, " ").replaceAll("·", "-");
 
@@ -119,6 +125,20 @@ export type FormularioRegistro = Omit<DatosDeRegistro, "direccion"> & {
   aceptaTerminos: boolean;
 };
 
+function validarCanal(canal: string, detalle: string): ProblemaDeCampo[] {
+  if (!canal) return [{ campo: "canal", mensaje: "Cuéntanos cómo nos conociste." }];
+  if (requiereDetalleDeCanal(canal)) {
+    const d = detalle.trim();
+    if (d.length < 2) return [{ campo: "canalDetalle", mensaje: "¿Dónde o con quién? Escríbelo aquí." }];
+    if (d.length > LARGO_MAXIMO_CANAL_DETALLE) return [{ campo: "canalDetalle", mensaje: "Acórtalo un poco." }];
+  }
+  return [];
+}
+
+/**
+ * Todo es obligatorio al crear la cuenta, dirección incluida (sirve para
+ * cualquier envío futuro y para tener el padrón completo).
+ */
 export function validarRegistro(d: FormularioRegistro): ProblemaDeCampo[] {
   const p: ProblemaDeCampo[] = [];
   if (d.nombre.trim().length < 3) p.push({ campo: "nombre", mensaje: "Escribe tu nombre completo." });
@@ -128,7 +148,8 @@ export function validarRegistro(d: FormularioRegistro): ProblemaDeCampo[] {
   const clave = problemaDeContrasena(d.contrasena);
   if (clave) p.push({ campo: "contrasena", mensaje: clave });
   if (!d.ciudad) p.push({ campo: "ciudad", mensaje: "Elige tu ciudad." });
-  if (requiereDireccion(d.ciudad)) p.push(...validarDireccion(d.direccion));
+  p.push(...validarDireccion(d.direccion));
+  p.push(...validarCanal(d.canal, d.canalDetalle));
   if (!d.aceptaTerminos) p.push({ campo: "terminos", mensaje: "Acepta los términos para crear tu cuenta." });
   return p;
 }
@@ -146,7 +167,7 @@ export function validarPerfil(p: Pick<FormularioPerfil, "nombre" | "telefono"> &
   if (p.nombre.trim().length < 3) r.push({ campo: "nombre", mensaje: "Escribe tu nombre completo." });
   else if (p.nombre.trim().length > LARGO_MAXIMO_NOMBRE) r.push({ campo: "nombre", mensaje: "El nombre es demasiado largo." });
   if (!normalizarTelefono(p.telefono)) r.push({ campo: "telefono", mensaje: "Tu WhatsApp a 10 dígitos." });
-  if (p.direccion && requiereDireccion(p.ciudad ?? null)) r.push(...validarDireccion(p.direccion));
+  if (p.direccion) r.push(...validarDireccion(p.direccion));
   return r;
 }
 
@@ -257,7 +278,8 @@ export class ServicioCuenta {
         contrasena: d.contrasena,
         ciudad: d.ciudad,
         canal: d.canal,
-        direccion: requiereDireccion(d.ciudad) ? componerDireccion(d.direccion) : "",
+        canalDetalle: requiereDetalleDeCanal(d.canal) ? d.canalDetalle.trim().replace(/\s+/g, " ") : "",
+        direccion: componerDireccion(d.direccion),
       },
       volverA,
       captcha,
@@ -292,7 +314,7 @@ export class ServicioCuenta {
     await this.repo.guardarPerfil({
       nombre,
       telefono: normalizarTelefono(p.telefono),
-      direccion: requiereDireccion(p.ciudad) ? componerDireccion(p.direccion) : null,
+      direccion: componerDireccion(p.direccion),
       ciudad: p.ciudad || null,
       canalId: p.canalId,
     });

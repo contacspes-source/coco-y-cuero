@@ -24,6 +24,8 @@ export interface RepositorioCatalogo {
   /** Guarda todo el perfume en una transacción. Devuelve su id. */
   guardarPerfume(datos: PerfumeEditable): Promise<number>;
   cambiarPublicado(perfumeId: number, publicado: boolean): Promise<void>;
+  /** Borra de verdad; la base lo rechaza si el perfume tiene pedidos. */
+  eliminarPerfume(perfumeId: number): Promise<void>;
   /** Cambia solo la foto (para reencuadrar sin tocar lo demás). */
   cambiarFoto(perfumeId: number, url: string): Promise<void>;
   /** Todos o ninguno. Devuelve cuántos precios cambiaron. */
@@ -52,6 +54,9 @@ export interface RepositorioVentas {
   listarClientes(): Promise<ClienteAdmin[]>;
   guardarCliente(c: ClienteEditable): Promise<number>;
   canales(): Promise<{ id: number; nombre: string }[]>;
+  /** Baja lógica: la base cancela sus solicitudes y lo marca inactivo. */
+  darDeBajaCliente(clienteId: number): Promise<void>;
+  reactivarCliente(clienteId: number): Promise<void>;
   listarPedidos(): Promise<PedidoAdmin[]>;
   crearPedido(p: NuevoPedido): Promise<number>;
   actualizarPedido(id: number, cambios: CambiosDePedido): Promise<void>;

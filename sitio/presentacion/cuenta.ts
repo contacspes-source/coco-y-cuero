@@ -10,7 +10,9 @@ import {
   ESTADOS_DE_MEXICO,
   ESTADO_CLIENTE,
   ErrorDeValidacion,
+  LARGO_MAXIMO_CANAL_DETALLE,
   LARGO_MINIMO_CONTRASENA,
+  requiereDetalleDeCanal,
   etapasDe,
   pedidosActivos,
   precioConBienvenida,
@@ -35,6 +37,7 @@ let sesion: SesionActual | null = null;
 /** 0.1 mientras la cuenta no tenga su primera compra; 0 después. */
 let descuento = 0;
 let botonCabecera: HTMLButtonElement | null = null;
+let botonCrear: HTMLButtonElement | null = null;
 let barraPromo: HTMLElement | null = null;
 let alCambiarSesion: () => void = () => {};
 
@@ -66,6 +69,8 @@ function actualizarBoton() {
     botonCabecera.classList.toggle("con-sesion", Boolean(sesion));
     botonCabecera.setAttribute("aria-label", sesion ? `Mi cuenta de ${nombreCorto()}` : "Entrar a mi cuenta");
   }
+  // "Crear cuenta" solo tiene sentido sin sesión
+  if (botonCrear) botonCrear.hidden = Boolean(sesion);
   pintarPromo();
 }
 
@@ -156,14 +161,17 @@ async function refrescarSesion() {
 /** Se llama al cargar la página: restaura la sesión si existe. */
 export async function iniciarCuenta(
   boton: HTMLButtonElement,
+  crear: HTMLButtonElement | null,
   promo: HTMLElement | null,
   conSesionPrevia: boolean,
   alCambiar: () => void,
 ) {
   botonCabecera = boton;
+  botonCrear = crear;
   barraPromo = promo;
   alCambiarSesion = alCambiar;
   boton.addEventListener("click", () => (sesion ? abrirMiCuenta() : abrirEntrar()));
+  crear?.addEventListener("click", () => void abrirRegistro());
   sesionResuelta = !conSesionPrevia;
   actualizarBoton();
   if (!conSesionPrevia) return;
@@ -194,6 +202,10 @@ async function prepararSesion() {
     } else if (sesion) {
       avisar(`¡Cuenta confirmada! Bienvenido, ${nombreCorto()}.`, "exito");
       void abrirMiCuenta();
+    } else {
+      // el enlace se abrió en otro navegador o dispositivo: la cuenta ya
+      // quedó confirmada, pero la sesión no se pudo crear aquí
+      abrirEntrar(undefined, "¡Tu cuenta quedó confirmada! Entra con tu correo y contraseña.");
     }
   }
 }
@@ -225,7 +237,7 @@ function selectorCiudad(valor: string | null): HTMLSelectElement {
  * Los campos de dirección completa. Solo se muestran cuando la entrega
  * es por envío a otra ciudad; en GDL, Zamora y Morelia no hacen falta.
  */
-function camposDireccion(inicial: Direccion, ciudad: HTMLSelectElement) {
+function camposDireccion(inicial: Direccion, ciudad: HTMLSelectElement, siempre = false) {
   const calle = h("input", { value: inicial.calle, autocomplete: "address-line1", maxlength: 120, placeholder: "Av. Juárez 120 int. 3" });
   const colonia = h("input", { value: inicial.colonia, autocomplete: "address-level3", maxlength: 80 });
   const cp = h("input", { value: inicial.cp, autocomplete: "postal-code", inputmode: "numeric", maxlength: 5, placeholder: "00000" });
@@ -241,14 +253,20 @@ function camposDireccion(inicial: Direccion, ciudad: HTMLSelectElement) {
   const nodo = h(
     "fieldset",
     { clase: "cta-direccion" },
-    h("legend", null, "Dirección de envío"),
-    h("p", { clase: "cta-nota" }, "Solo para envíos por paquetería a otra ciudad de la república."),
-    campo("Calle y número", calle, { nombre: "calle" }),
-    h("div", { clase: "cta-dos" }, campo("Colonia", colonia, { nombre: "colonia" }), campo("Código postal", cp, { nombre: "cp" })),
-    h("div", { clase: "cta-dos" }, campo("Ciudad o municipio", municipio, { nombre: "municipio" }), campo("Estado", estado, { nombre: "estado" })),
+    h("legend", null, siempre ? "Tu dirección" : "Dirección de envío"),
+    h(
+      "p",
+      { clase: "cta-nota" },
+      siempre
+        ? "La usamos para envíos por paquetería y para coordinar entregas. Nunca la compartimos."
+        : "Solo para envíos por paquetería a otra ciudad de la república.",
+    ),
+    campo("Calle y número", calle, { nombre: "calle", obligatorio: true }),
+    h("div", { clase: "cta-dos" }, campo("Colonia", colonia, { nombre: "colonia", obligatorio: true }), campo("Código postal", cp, { nombre: "cp", obligatorio: true })),
+    h("div", { clase: "cta-dos" }, campo("Ciudad o municipio", municipio, { nombre: "municipio", obligatorio: true }), campo("Estado", estado, { nombre: "estado", obligatorio: true })),
     campo("Referencias", referencias, { nombre: "referencias" }),
   );
-  const sincronizar = () => (nodo.hidden = !requiereDireccion(ciudad.value));
+  const sincronizar = () => (nodo.hidden = !siempre && !requiereDireccion(ciudad.value));
   ciudad.addEventListener("change", sincronizar);
   sincronizar();
   const leer = (): Direccion => ({
@@ -357,13 +375,19 @@ export async function abrirRegistro(continuar?: () => void) {
   const correoIn = h("input", { type: "email", autocomplete: "email", inputmode: "email" });
   const clave = h("input", { type: "password", autocomplete: "new-password" });
   const ciudad = selectorCiudad(null);
-  const direccion = camposDireccion(separarDireccion(null), ciudad);
+  const direccion = camposDireccion(separarDireccion(null), ciudad, true);
   const canal = h(
     "select",
     null,
     h("option", { value: "" }, "Elige…"),
     canales.map((c) => h("option", { value: c.nombre }, c.nombre)),
   );
+  // "Otro": que diga dónde o con quién (sirve para saber qué anuncio funciona)
+  const canalDetalle = h("input", { maxlength: LARGO_MAXIMO_CANAL_DETALLE, placeholder: "Ej. una amiga, un evento, un volante…" });
+  const cajaDetalle = campo("¿Dónde o con quién?", canalDetalle, { nombre: "canalDetalle", obligatorio: true });
+  const sincronizarDetalle = () => (cajaDetalle.hidden = !requiereDetalleDeCanal(canal.value));
+  canal.addEventListener("change", sincronizarDetalle);
+  sincronizarDetalle();
   const acepta = h("input", { type: "checkbox" });
   const error = errorGeneral();
   const boton = h("button", { clase: "boton boton-oscuro boton-ancho", type: "submit" }, "Crear mi cuenta");
@@ -391,6 +415,7 @@ export async function abrirRegistro(continuar?: () => void) {
                   ciudad: ciudad.value,
                   direccion: direccion.leer(),
                   canal: canal.value,
+                  canalDetalle: canalDetalle.value,
                   aceptaTerminos: acepta.checked,
                 },
                 volverAqui(),
@@ -416,11 +441,13 @@ export async function abrirRegistro(continuar?: () => void) {
         },
       },
     },
-    campo("Nombre completo", nombre, { nombre: "nombre" }),
-    campo("WhatsApp", telefono, { nombre: "telefono", ayuda: "Ahí te confirmamos cada pedido." }),
-    campo("Correo", correoIn, { nombre: "correo" }),
-    campo("Contraseña", clave, { nombre: "contrasena", ayuda: `Al menos ${LARGO_MINIMO_CONTRASENA} caracteres, con letras y números.` }),
-    h("div", { clase: "cta-dos" }, campo("Ciudad", ciudad, { nombre: "ciudad" }), campo("¿Cómo nos conociste?", canal, { nombre: "canal" })),
+    h("p", { clase: "cta-nota cta-obligatorios" }, "Los campos con * son obligatorios."),
+    campo("Nombre completo", nombre, { nombre: "nombre", obligatorio: true }),
+    campo("WhatsApp", telefono, { nombre: "telefono", obligatorio: true, ayuda: "Ahí te confirmamos cada pedido." }),
+    campo("Correo", correoIn, { nombre: "correo", obligatorio: true }),
+    campo("Contraseña", clave, { nombre: "contrasena", obligatorio: true, ayuda: `Al menos ${LARGO_MINIMO_CONTRASENA} caracteres, con letras y números.` }),
+    h("div", { clase: "cta-dos" }, campo("Ciudad", ciudad, { nombre: "ciudad", obligatorio: true }), campo("¿Cómo nos conociste?", canal, { nombre: "canal", obligatorio: true })),
+    cajaDetalle,
     direccion.nodo,
     h(
       "div",
@@ -576,7 +603,7 @@ function formularioDatos(perfil: Perfil, canales: { id: number; nombre: string }
   const nombre = h("input", { value: perfil.nombre, autocomplete: "name" });
   const telefono = h("input", { type: "tel", value: perfil.telefono ?? "", autocomplete: "tel" });
   const ciudad = selectorCiudad(perfil.ciudad);
-  const direccion = camposDireccion(separarDireccion(perfil.direccion), ciudad);
+  const direccion = camposDireccion(separarDireccion(perfil.direccion), ciudad, true);
   const canal = h(
     "select",
     null,
@@ -678,6 +705,9 @@ function pintarCuenta(hoja: Hoja, perfil: Perfil, pedidos: PedidoPropio[], canal
   hoja.pintar(
     h("p", { clase: "rotulo" }, "Mi cuenta"),
     h("h2", { clase: "cta-titulo" }, `Hola, ${primerNombre(perfil.nombre)}`),
+    ...(perfil.activo
+      ? []
+      : [h("p", { clase: "cta-error", role: "alert" }, "Tu cuenta está dada de baja: no puedes apartar perfumes. Si crees que es un error, escríbenos por WhatsApp.")]),
     ...(estadoBienvenida() === "disponible"
       ? [h("p", { clase: "cta-bienvenida" }, `Tienes ${PORCENTAJE} de descuento en tu primera compra. Se aplica solo al apartar.`)]
       : []),

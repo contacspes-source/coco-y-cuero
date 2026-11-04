@@ -145,6 +145,14 @@ export class RepositorioCatalogoSupabase implements RepositorioCatalogo {
     }
   }
 
+  async eliminarPerfume(perfumeId: number): Promise<void> {
+    try {
+      revisar(await supabase().rpc("eliminar_perfume", { p_perfume_id: perfumeId }));
+    } catch (e) {
+      throw traducirError(e);
+    }
+  }
+
   async cambiarFoto(perfumeId: number, url: string): Promise<void> {
     try {
       const r = await supabase().from("perfume").update({ imagen_url: url }).eq("id", perfumeId).select("id");

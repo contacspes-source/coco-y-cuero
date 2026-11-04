@@ -42,6 +42,11 @@ export class ServicioCatalogo {
     return this.repo.cambiarPublicado(perfumeId, true);
   }
 
+  /** Borra de verdad. Solo si no tiene pedidos; si los tiene, la base avisa. */
+  eliminar(perfumeId: number): Promise<void> {
+    return this.repo.eliminarPerfume(perfumeId);
+  }
+
   /**
    * Fotos que se pueden reencuadrar en lote: las subidas desde el panel
    * (viven en Supabase). Las del repositorio ya vienen encuadradas.

@@ -5,7 +5,7 @@
 -- Supabase y ejecútalo. Todo corre dentro de una transacción que
 -- termina en ROLLBACK, así que NO deja datos de prueba.
 --
--- Resultado esperado: las 74 filas con estado = 'OK' (la numeración salta del 8 al 11).
+-- Resultado esperado: las 84 filas con estado = 'OK' (la numeración salta del 8 al 11).
 -- Si alguna dice 'FALLA', no publiques el cambio que hiciste.
 --
 -- Córrelas cada vez que toques una política RLS, un GRANT o una
@@ -459,6 +459,70 @@ begin
   begin perform public.hook_antes_de_crear_usuario('{}'); r := 'EJECUTO';
   exception when insufficient_privilege then r := 'bloqueado'; end;
   reset role; insert into _p values (76,'cliente llama al hook de registro','bloqueado',r);
+
+  -- ===== 016: BAJA DE CLIENTES, DETALLE DE CANAL, BORRAR PERFUMES =====
+  insert into auth.users (id, email, raw_user_meta_data)
+  values ('ffffffff-0000-0000-0000-000000000006', 'otro@prueba.mx',
+          '{"nombre":"Otro Canal","canal":"Otro","canal_detalle":"  una amiga del gym "}');
+  select canal_detalle into r from public.cliente where auth_user_id = 'ffffffff-0000-0000-0000-000000000006';
+  insert into _p values (77,'canal Otro guarda el detalle','una amiga del gym',r);
+
+  -- Ana (cliente) no puede dar de baja a nadie, ni a sí misma
+  perform set_config('request.jwt.claims','{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}', true);
+  set local role authenticated;
+  begin perform public.dar_de_baja_cliente((select id from public.cliente where auth_user_id = auth.uid())); r := 'SE DIO DE BAJA';
+  exception when insufficient_privilege then r := 'bloqueado'; end;
+  reset role; insert into _p values (78,'cliente se da de baja solo','bloqueado',r);
+
+  -- el admin da de baja a Ana: sus solicitudes se cancelan y ya no puede apartar
+  perform set_config('request.jwt.claims','{"sub":"cccccccc-0000-0000-0000-000000000003","role":"authenticated"}', true);
+  set local role authenticated;
+  perform public.dar_de_baja_cliente((select id from public.cliente where auth_user_id = 'aaaaaaaa-0000-0000-0000-000000000001'));
+  reset role;
+  select (not activo and baja_en is not null)::text into r from public.cliente where auth_user_id = 'aaaaaaaa-0000-0000-0000-000000000001';
+  insert into _p values (79,'admin da de baja a un cliente','true',r);
+  select count(*)::text into r from public.pedido p join public.cliente c on c.id = p.cliente_id
+   where c.auth_user_id = 'aaaaaaaa-0000-0000-0000-000000000001' and p.estado = 'consultado';
+  insert into _p values (80,'la baja cancela sus solicitudes','0',r);
+  perform set_config('request.jwt.claims','{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}', true);
+  set local role authenticated;
+  begin perform public.solicitar_pedido(pres); r := 'PIDIO';
+  exception when raise_exception then r := 'bloqueado'; end;
+  reset role; insert into _p values (81,'cliente dado de baja no aparta','bloqueado',r);
+
+  -- reactivar
+  perform set_config('request.jwt.claims','{"sub":"cccccccc-0000-0000-0000-000000000003","role":"authenticated"}', true);
+  set local role authenticated;
+  perform public.reactivar_cliente((select id from public.cliente where auth_user_id = 'aaaaaaaa-0000-0000-0000-000000000001'));
+  reset role;
+  select activo::text into r from public.cliente where auth_user_id = 'aaaaaaaa-0000-0000-0000-000000000001';
+  insert into _p values (82,'admin reactiva al cliente','true',r);
+
+  -- no se da de baja a quien tiene pedidos apartados/comprados (Beto tiene uno entregado y uno apartado)
+  perform set_config('request.jwt.claims','{"sub":"cccccccc-0000-0000-0000-000000000003","role":"authenticated"}', true);
+  set local role authenticated;
+  begin perform public.dar_de_baja_cliente((select id from public.cliente where auth_user_id = 'bbbbbbbb-0000-0000-0000-000000000002')); r := 'SE DIO DE BAJA';
+  exception when raise_exception then r := 'bloqueado'; end;
+  reset role; insert into _p values (83,'baja con pedidos en curso','bloqueado',r);
+
+  -- borrar perfumes: el de prueba (sin pedidos) sí; el que tiene pedidos no
+  perform set_config('request.jwt.claims','{"sub":"cccccccc-0000-0000-0000-000000000003","role":"authenticated"}', true);
+  set local role authenticated;
+  begin
+    perform public.eliminar_perfume((select id from public.perfume where nombre = 'Perfume de Prueba'));
+    r := (not exists (select 1 from public.perfume where nombre = 'Perfume de Prueba'))::text;
+  exception when others then r := 'ERROR: ' || sqlerrm; end;
+  reset role; insert into _p values (84,'admin borra un perfume sin pedidos','true',r);
+  perform set_config('request.jwt.claims','{"sub":"cccccccc-0000-0000-0000-000000000003","role":"authenticated"}', true);
+  set local role authenticated;
+  begin perform public.eliminar_perfume((select perfume_id from public.presentacion where id = pres)); r := 'BORRO';
+  exception when raise_exception then r := 'bloqueado'; end;
+  reset role; insert into _p values (85,'borrar perfume con pedidos','bloqueado',r);
+  perform set_config('request.jwt.claims','{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}', true);
+  set local role authenticated;
+  begin perform public.eliminar_perfume((select min(id) from public.perfume)); r := 'BORRO';
+  exception when insufficient_privilege then r := 'bloqueado'; end;
+  reset role; insert into _p values (86,'cliente borra un perfume','bloqueado',r);
 end $$;
 
 select n, prueba, esperado, obtenido,

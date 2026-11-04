@@ -10,7 +10,10 @@ let cliente: SupabaseClient | null = null;
 
 export function supabase(): SupabaseClient {
   cliente ??= createClient(SUPABASE_URL, SUPABASE_LLAVE_PUBLICABLE, {
-    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+    // storageKey distinto al del sitio: así entrar al panel no te deja
+    // "entrado" en la tienda, y expulsar a un cliente del panel no le
+    // cierra su sesión en el sitio (comparten dominio y localStorage)
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: "cyc-panel-sesion" },
   });
   return cliente;
 }
