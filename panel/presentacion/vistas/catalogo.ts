@@ -109,6 +109,25 @@ export function vistaCatalogo(alSesionVencida: () => void): HTMLElement {
     }
   }
 
+  async function eliminar(p: Perfume) {
+    const ok = await confirmar({
+      titulo: `¿Borrar ${p.nombre} para siempre?`,
+      texto: "Se borran el perfume, sus presentaciones, precios, costos y notas. No se puede deshacer. Si tiene pedidos, la base lo va a rechazar: en ese caso déjalo de baja.",
+      aceptar: "Borrar para siempre",
+      peligro: true,
+    });
+    if (!ok) return;
+    try {
+      await servicios.catalogo.eliminar(p.id);
+      await recargar();
+      avisar(`${p.nombre} se borró.`, "exito");
+      pintar();
+    } catch (e) {
+      avisar(mensajeDe(e), "error");
+      if (esDeSesion(e)) alSesionVencida();
+    }
+  }
+
   function renglon(p: Perfume): HTMLElement {
     const principal = p.presentaciones[0];
     const s = semaforoDe(p);
@@ -169,6 +188,10 @@ export function vistaCatalogo(alSesionVencida: () => void): HTMLElement {
           h("span", { clase: "interruptor-texto" }, p.publicado ? "En venta" : "De baja"),
         ),
         h("a", { clase: "boton boton-fantasma boton-chico", href: `#/perfume/${p.id}` }, "Editar"),
+        // borrar solo se ofrece cuando ya está de baja: dos pasos, cero accidentes
+        p.publicado
+          ? null
+          : h("button", { type: "button", clase: "boton boton-peligro boton-chico", title: "Borrar para siempre", al: { click: () => void eliminar(p) } }, "Borrar"),
       ),
     );
   }

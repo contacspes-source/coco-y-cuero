@@ -25,6 +25,7 @@ let enRecuperacion = /type=recovery/.test(location.hash);
 function mostrarLogin() {
   estado.correo = null;
   estado.sucio = false;
+  raiz.classList.remove("con-marco");
   vaciar(raiz, vistaLogin((correo) => void entrar(correo)));
 }
 
@@ -58,13 +59,16 @@ async function entrar(correo: string) {
 // ------------------------------------------------------------ marco
 const contenido = h("main", { id: "contenido", clase: "contenido", tabindex: -1 });
 
+/** Menú lateral (en teléfono se vuelve una barra arriba, ver estilos.css). */
 function pintarMarco() {
-  const enlace = (ruta: string, texto: string) => h("a", { href: ruta, dataset: { ruta } }, texto);
+  const enlace = (ruta: string, texto: string, icono: string) =>
+    h("a", { href: ruta, dataset: { ruta } }, h("span", { clase: "nav-icono", "aria-hidden": "true" }, icono), h("span", null, texto));
+  raiz.classList.add("con-marco");
   vaciar(
     raiz,
     h(
-      "header",
-      { clase: "barra-superior" },
+      "aside",
+      { clase: "barra-lateral" },
       h(
         "a",
         { clase: "marca", href: "#/" },
@@ -74,11 +78,11 @@ function pintarMarco() {
       h(
         "nav",
         { clase: "navegacion", "aria-label": "Secciones" },
-        enlace("#/pedidos", "Pedidos"),
-        enlace("#/clientes", "Clientes"),
-        enlace("#/", "Catálogo"),
-        enlace("#/precios", "Precios"),
-        enlace("#/reportes", "Reportes"),
+        enlace("#/pedidos", "Pedidos", "◷"),
+        enlace("#/clientes", "Clientes", "☺"),
+        enlace("#/", "Catálogo", "✦"),
+        enlace("#/precios", "Precios", "$"),
+        enlace("#/reportes", "Reportes", "▤"),
       ),
       h(
         "div",

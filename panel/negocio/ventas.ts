@@ -187,6 +187,8 @@ export class ServicioVentas {
   constructor(private readonly repo: RepositorioVentas) {}
 
   listarClientes = () => this.repo.listarClientes();
+  darDeBajaCliente = (id: number) => this.repo.darDeBajaCliente(id);
+  reactivarCliente = (id: number) => this.repo.reactivarCliente(id);
   listarPedidos = () => this.repo.listarPedidos();
   canales = () => this.repo.canales();
 

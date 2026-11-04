@@ -57,9 +57,12 @@ function cliente(c: Partial<ClienteAdmin> & { id: number }): ClienteAdmin {
     direccion: null,
     ciudad: null,
     canal: null,
+    canalDetalle: null,
     correo: null,
     rol: "cliente",
     conCuenta: false,
+    activo: true,
+    bajaEn: null,
     creadoEn: "2026-10-01T00:00:00Z",
     pedidos: 0,
     pedidosActivos: 0,
@@ -179,6 +182,9 @@ describe("ServicioVentas", () => {
     async listarClientes() { return []; }
     async guardarCliente(c: ClienteEditable) { this.clientes.push(c); return 9; }
     async canales() { return []; }
+    bajas: number[] = [];
+    async darDeBajaCliente(id: number) { this.bajas.push(id); }
+    async reactivarCliente(id: number) { this.bajas = this.bajas.filter((x) => x !== id); }
     async listarPedidos() { return []; }
     async crearPedido(p: NuevoPedido) { this.creados.push(p); return 1; }
     async actualizarPedido(id: number, c: CambiosDePedido) { this.cambios.push([id, c]); }

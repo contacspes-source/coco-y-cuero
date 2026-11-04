@@ -60,9 +60,12 @@ export class RepositorioVentasSupabase implements RepositorioVentas {
       direccion: texto(f.direccion),
       ciudad: texto(f.ciudad),
       canal: texto(f.canal),
+      canalDetalle: texto(f.canal_detalle),
       correo: texto(f.correo),
       rol: f.rol as Rol,
       conCuenta: Boolean(f.con_cuenta),
+      activo: f.activo !== false,
+      bajaEn: texto(f.baja_en),
       creadoEn: String(f.creado_en),
       pedidos: num(f.pedidos),
       pedidosActivos: num(f.pedidos_activos),
@@ -85,6 +88,14 @@ export class RepositorioVentasSupabase implements RepositorioVentas {
 
   async canales(): Promise<{ id: number; nombre: string }[]> {
     return revisar(await supabase().from("canal_origen").select("id, nombre").order("id"));
+  }
+
+  async darDeBajaCliente(clienteId: number): Promise<void> {
+    revisar(await supabase().rpc("dar_de_baja_cliente", { p_cliente_id: clienteId }));
+  }
+
+  async reactivarCliente(clienteId: number): Promise<void> {
+    revisar(await supabase().rpc("reactivar_cliente", { p_cliente_id: clienteId }));
   }
 
   async listarPedidos(): Promise<PedidoAdmin[]> {

@@ -59,13 +59,18 @@ export function avisar(mensaje: string, tipo: "exito" | "error" | "info" = "info
 }
 
 // ------------------------------------------------------------ formularios
-export function campo(etiqueta: string, control: HTMLElement, opciones: { nombre?: string; ayuda?: string } = {}) {
+export function campo(
+  etiqueta: string,
+  control: HTMLElement,
+  opciones: { nombre?: string; ayuda?: string; obligatorio?: boolean } = {},
+) {
   const id = control.id || `c-${Math.random().toString(36).slice(2, 8)}`;
   control.id = id;
+  if (opciones.obligatorio) control.setAttribute("aria-required", "true");
   return h(
     "div",
-    { clase: "campo", dataset: opciones.nombre ? { campo: opciones.nombre } : undefined },
-    h("label", { for: id }, etiqueta),
+    { clase: opciones.obligatorio ? "campo campo-obligatorio" : "campo", dataset: opciones.nombre ? { campo: opciones.nombre } : undefined },
+    h("label", { for: id }, etiqueta, opciones.obligatorio ? h("span", { clase: "campo-asterisco", "aria-hidden": "true" }, " *") : null),
     control,
     opciones.ayuda ? h("p", { clase: "campo-ayuda" }, opciones.ayuda) : null,
     h("p", { clase: "campo-error", role: "alert" }),

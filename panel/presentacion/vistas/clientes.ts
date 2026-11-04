@@ -3,11 +3,12 @@ import type { ClienteAdmin, ClienteEditable } from "../../../compartido/tipos";
 import { ErrorDeValidacion, esDeSesion, mensajeDe } from "../../negocio/errores";
 import { enlaceWhatsApp, esActivo, filtrarClientes } from "../../negocio/ventas";
 import { estado, recargarVentas, servicios } from "../estado";
-import { avisar, campo, iconoWhatsApp, conBotonOcupado, fmtPesos, h, marcarErrores, selector, vaciar } from "../ui";
+import { avisar, campo, confirmar, iconoWhatsApp, conBotonOcupado, fmtPesos, h, marcarErrores, selector, vaciar } from "../ui";
 import { chipEstado } from "./pedidos";
 
 const fecha = new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short", year: "numeric" });
 let busqueda = "";
+let verBajas = false;
 
 // ------------------------------------------------------------ lista
 export function vistaClientes(): HTMLElement {
@@ -18,7 +19,7 @@ export function vistaClientes(): HTMLElement {
     const wa = enlaceWhatsApp(c.telefono, `Hola ${c.nombre.split(" ")[0]}, te escribo de Coco & Cuero.`);
     return h(
       "article",
-      { clase: "renglon renglon-cliente", role: "listitem" },
+      { clase: `renglon renglon-cliente${c.activo ? "" : " de-baja"}`, role: "listitem" },
       h("div", { clase: "numero-cliente" }, `#${c.numeroCliente}`),
       h(
         "div",
@@ -30,8 +31,9 @@ export function vistaClientes(): HTMLElement {
         "div",
         { clase: "renglon-etiquetas" },
         c.ciudad ? h("span", { clase: "etiqueta etiqueta-suave" }, c.ciudad) : null,
-        c.canal ? h("span", { clase: "etiqueta etiqueta-suave" }, c.canal) : null,
+        c.canal ? h("span", { clase: "etiqueta etiqueta-suave", title: c.canalDetalle ?? "" }, c.canalDetalle ? `${c.canal}: ${c.canalDetalle}` : c.canal) : null,
         c.rol === "admin" ? h("span", { clase: "etiqueta" }, "Admin") : c.conCuenta ? h("span", { clase: "etiqueta" }, "Con cuenta") : null,
+        c.activo ? null : h("span", { clase: "etiqueta etiqueta-baja" }, "De baja"),
       ),
       h(
         "dl",
@@ -50,8 +52,10 @@ export function vistaClientes(): HTMLElement {
   }
 
   function pintar() {
-    const visibles = filtrarClientes(estado.clientes, busqueda);
-    contador.textContent = `${visibles.length} ${visibles.length === 1 ? "cliente" : "clientes"}`;
+    const base = verBajas ? estado.clientes : estado.clientes.filter((c) => c.activo);
+    const visibles = filtrarClientes(base, busqueda);
+    const bajas = estado.clientes.filter((c) => !c.activo).length;
+    contador.textContent = `${visibles.length} ${visibles.length === 1 ? "cliente" : "clientes"}${bajas && !verBajas ? ` · ${bajas} de baja (ocultos)` : ""}`;
     vaciar(lista, ...(visibles.length ? visibles.map(renglon) : [h("div", { clase: "vacio" }, h("p", null, "Ningún cliente coincide."))]));
   }
 
@@ -64,7 +68,16 @@ export function vistaClientes(): HTMLElement {
     al: { input: () => { busqueda = buscador.value; pintar(); } },
   });
 
-  const conCuenta = estado.clientes.filter((c) => c.conCuenta).length;
+  const interruptorBajas = h(
+    "label",
+    { clase: "interruptor interruptor-filtro" },
+    h("input", { type: "checkbox", role: "switch", checked: verBajas, al: { change: (e) => { verBajas = (e.target as HTMLInputElement).checked; pintar(); } } }),
+    h("span", { clase: "interruptor-pista", "aria-hidden": "true" }),
+    h("span", { clase: "interruptor-texto" }, "Ver dados de baja"),
+  );
+
+  const activos = estado.clientes.filter((c) => c.activo);
+  const conCuenta = activos.filter((c) => c.conCuenta).length;
   const vista = h(
     "section",
     { clase: "vista" },
@@ -78,12 +91,12 @@ export function vistaClientes(): HTMLElement {
       "div",
       { clase: "tarjetas-resumen tarjetas-3" },
       ...[
-        ["Clientes", String(estado.clientes.length), `${conCuenta} con cuenta en la página`],
-        ["Con pedidos en curso", String(estado.clientes.filter((c) => c.pedidosActivos > 0).length), "esperando algo de ti"],
+        ["Clientes", String(activos.length), `${conCuenta} con cuenta en la página`],
+        ["Con pedidos en curso", String(activos.filter((c) => c.pedidosActivos > 0).length), "esperando algo de ti"],
         ["Vendido", fmtPesos(estado.clientes.reduce((s, c) => s + c.totalEntregado, 0)), "en pedidos entregados"],
       ].map(([t, v, n]) => h("div", { clase: "tarjeta-resumen" }, h("p", { clase: "tarjeta-titulo" }, t!), h("p", { clase: "tarjeta-valor" }, v!), h("p", { clase: "tarjeta-nota" }, n!))),
     ),
-    h("div", { clase: "barra barra-sola" }, buscador),
+    h("div", { clase: "barra barra-clientes" }, buscador, interruptorBajas),
     contador,
     lista,
   );
@@ -157,6 +170,31 @@ export function vistaCliente(idTexto: string, navegar: (r: string) => void, alSe
   const pedidos = c ? estado.pedidos.filter((p) => p.clienteId === c.id) : [];
   const wa = c ? enlaceWhatsApp(c.telefono, `Hola ${c.nombre.split(" ")[0]}, te escribo de Coco & Cuero.`) : null;
 
+  // baja lógica: desaparece de la lista y no puede apartar, pero sus
+  // pedidos e historial se quedan para los reportes
+  async function cambiarActivo() {
+    if (!c) return;
+    if (c.activo) {
+      const ok = await confirmar({
+        titulo: `¿Dar de baja a ${c.nombre}?`,
+        texto: "Ya no podrá apartar desde la página y sus solicitudes pendientes se cancelan. Sus pedidos anteriores se conservan. Lo puedes reactivar cuando quieras.",
+        aceptar: "Dar de baja",
+        peligro: true,
+      });
+      if (!ok) return;
+    }
+    try {
+      if (c.activo) await servicios.ventas.darDeBajaCliente(c.id);
+      else await servicios.ventas.reactivarCliente(c.id);
+      await recargarVentas();
+      avisar(c.activo ? `${c.nombre} quedó dado de baja.` : `${c.nombre} vuelve a estar activo.`, "exito");
+      navegar(c.activo ? "#/clientes" : `#/clientes/${c.id}`);
+    } catch (e) {
+      avisar(mensajeDe(e), "error");
+      if (esDeSesion(e)) alSesionVencida();
+    }
+  }
+
   return h(
     "section",
     { clase: "vista" },
@@ -168,14 +206,25 @@ export function vistaCliente(idTexto: string, navegar: (r: string) => void, alSe
         null,
         h("a", { clase: "volver", href: "#/clientes" }, "← Clientes"),
         h("h1", null, esNuevo ? "Nuevo cliente" : c!.nombre),
-        c ? h("p", { clase: "vista-sub" }, `Cliente #${c.numeroCliente} · desde ${fecha.format(new Date(c.creadoEn))}`) : null,
+        c
+          ? h(
+              "p",
+              { clase: "vista-sub" },
+              `Cliente #${c.numeroCliente} · desde ${fecha.format(new Date(c.creadoEn))}`,
+              c.canalDetalle ? ` · nos conoció por: ${c.canalDetalle}` : "",
+              c.activo ? "" : ` · DE BAJA${c.bajaEn ? ` desde ${fecha.format(new Date(c.bajaEn))}` : ""}`,
+            )
+          : null,
       ),
       c
         ? h(
             "div",
             { clase: "vista-acciones" },
             wa ? h("a", { clase: "boton boton-fantasma", href: wa, target: "_blank", rel: "noopener" }, "WhatsApp") : null,
-            h("a", { clase: "boton boton-primario", href: `#/pedidos/nuevo?cliente=${c.id}` }, "+ Pedido para este cliente"),
+            c.rol === "admin"
+              ? null
+              : h("button", { type: "button", clase: c.activo ? "boton boton-peligro" : "boton boton-fantasma", al: { click: () => void cambiarActivo() } }, c.activo ? "Dar de baja" : "Reactivar"),
+            c.activo ? h("a", { clase: "boton boton-primario", href: `#/pedidos/nuevo?cliente=${c.id}` }, "+ Pedido para este cliente") : null,
           )
         : null,
     ),

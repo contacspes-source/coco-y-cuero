@@ -271,6 +271,15 @@ main.catalogo{padding-top:44px;padding-bottom:84px}
   transition:all .18s ease;
 }
 .cuenta-boton:hover{background:var(--arena);border-color:var(--arena)}
+.cuenta-acciones{display:flex;gap:8px;align-items:center;flex:none}
+.cuenta-crear{background:var(--caramelo);border-color:var(--caramelo);color:var(--ebano);display:inline-flex;align-items:center;gap:8px}
+.cuenta-crear:hover{background:var(--cuero);border-color:var(--cuero);color:var(--crema)}
+.cuenta-crear-promo{font-family:var(--util);font-size:11px;letter-spacing:.08em;padding:2px 7px;border-radius:999px;background:var(--ebano);color:var(--crema)}
+.cuenta-crear[hidden]{display:none}
+@media (max-width:640px){
+  .cuenta-crear .cuenta-crear-promo{display:none}
+  .cuenta-boton{padding:8px 14px;font-size:15px}
+}
 .cuenta-boton.con-sesion{background:var(--ebano);border-color:var(--ebano);color:var(--crema);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cuenta-hola strong{font-weight:500}
 
@@ -920,3 +929,8 @@ a:focus-visible, button:focus-visible, input:focus-visible{
 .vacio strong{color:var(--ebano)}
 .boton-reintentar{display:flex;margin:18px auto 10px;width:fit-content}
 .detalle-error{display:block;margin-top:8px;font-size:11px;color:var(--tinta-suave);opacity:.7;word-break:break-word}
+
+/* campos obligatorios */
+.campo-asterisco{color:var(--cuero)}
+.cta-obligatorios{margin:0 0 -4px;font-size:12.5px}
+.campo[hidden]{display:none}

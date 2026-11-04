@@ -15,6 +15,8 @@ class CatalogoFalso implements RepositorioCatalogo {
   async listarPerfumes() { return [perfume({ id: 1 })]; }
   async guardarPerfume(d: PerfumeEditable) { this.guardados.push(d); return d.id ?? 99; }
   async cambiarPublicado(id: number, v: boolean) { this.publicados.push([id, v]); }
+  borrados: number[] = [];
+  async eliminarPerfume(id: number) { this.borrados.push(id); }
   fotos: [number, string][] = [];
   async cambiarFoto(id: number, url: string) { this.fotos.push([id, url]); }
   async actualizarPrecios(c: CambioDePrecio[]) { this.precios.push(c); return c.length; }
