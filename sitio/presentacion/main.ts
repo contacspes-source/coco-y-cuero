@@ -9,7 +9,14 @@ import { urlDeFoto, urlDirectaDeFoto, usarFotosPorNuestroDominio } from "../../c
 import type { PerfumePublico } from "../../compartido/tipos";
 import {
   CATEGORIAS,
+  CONCENTRACIONES,
   FAMILIAS,
+  PRESENTACIONES,
+  RANGOS_PRECIO,
+  claveDeTipo,
+  cuantosExtra,
+  esEstuche,
+  marcasDe,
   GENEROS,
   SIN_FILTROS,
   conteos,
@@ -52,6 +59,12 @@ const resumen = $("resumen");
 const generos = $("generos");
 const categorias = $("categorias");
 const aromas = $("aromas");
+const presentaciones = $("presentaciones");
+const precios = $("precios");
+const tipos = $("tipos");
+const marcaSelect = $<HTMLSelectElement>("marca");
+const masFiltros = $<HTMLDetailsElement>("mas-filtros");
+const masFiltrosCuenta = $("mas-filtros-cuenta");
 const buscador = $<HTMLInputElement>("buscador");
 const orden = $<HTMLSelectElement>("orden");
 const limpiar = $<HTMLButtonElement>("limpiar");
@@ -267,13 +280,80 @@ function pintarControles() {
     }),
   );
 
+  // presentación: estuches de regalo o solo el perfume
+  vaciar(
+    presentaciones,
+    ...[{ clave: null, nombre: "Todas", corto: "Todas" } as const, ...PRESENTACIONES]
+      .filter((x) => x.clave === null || (c.presentaciones[x.clave] ?? 0) > 0 || filtros.presentacion === x.clave)
+      .map((x) => {
+        const activa = filtros.presentacion === x.clave;
+        const n = x.clave ? (c.presentaciones[x.clave] ?? 0) : null;
+        const foto = x.clave === "estuches" ? muestras(perfumes, esEstuche, 1, SEMILLA + 11)[0] : undefined;
+        return h(
+          "button",
+          {
+            type: "button",
+            clase: `pildora${activa ? " activa" : ""}`,
+            "aria-pressed": String(activa),
+            al: { click: () => cambiar({ presentacion: activa && x.clave !== null ? null : x.clave }) },
+          },
+          foto ? miniatura(foto, "mini mini-pildora") : null,
+          x.nombre,
+          n === null ? null : h("span", { clase: "pildora-cuenta" }, String(n)),
+        );
+      }),
+  );
+
+  // más filtros: precio, concentración y marca
+  const pildoraChica = (texto: string, activa: boolean, n: number, alClic: () => void) =>
+    h(
+      "button",
+      {
+        type: "button",
+        clase: `pildora pildora-chica${activa ? " activa" : ""}`,
+        "aria-pressed": String(activa),
+        disabled: n === 0 && !activa,
+        al: { click: alClic },
+      },
+      texto,
+      h("span", { clase: "pildora-cuenta" }, String(n)),
+    );
+  vaciar(
+    precios,
+    ...RANGOS_PRECIO.map((r) => {
+      const activa = filtros.precio === r.clave;
+      return pildoraChica(r.nombre, activa, c.precios[r.clave] ?? 0, () => cambiar({ precio: activa ? null : r.clave }));
+    }),
+  );
+  const tiposEnCatalogo = new Set(perfumes.map((p) => claveDeTipo(p.tipo)));
+  vaciar(
+    tipos,
+    ...CONCENTRACIONES.filter((t) => tiposEnCatalogo.has(t.clave) || filtros.tipos.includes(t.clave)).map((t) => {
+      const activa = filtros.tipos.includes(t.clave);
+      return pildoraChica(t.corto, activa, c.tipos[t.clave] ?? 0, () =>
+        cambiar({ tipos: activa ? filtros.tipos.filter((x) => x !== t.clave) : [...filtros.tipos, t.clave] }),
+      );
+    }),
+  );
+  vaciar(
+    marcaSelect,
+    h("option", { value: "" }, "Todas las marcas"),
+    ...marcasDe(perfumes).map((m) => {
+      const n = c.marcas[m.clave] ?? 0;
+      return h("option", { value: m.clave, disabled: n === 0 && filtros.marca !== m.clave }, `${m.nombre} (${n})`);
+    }),
+  );
+  marcaSelect.value = filtros.marca ?? "";
+  const extra = cuantosExtra({ ...filtros, presentacion: null });
+  masFiltrosCuenta.textContent = extra ? String(extra) : "";
+
   if (buscador.value !== filtros.texto && document.activeElement !== buscador) buscador.value = filtros.texto;
   orden.value = filtros.orden;
   limpiar.hidden = !hayFiltros(filtros);
 
   // filtros activos como chips que se quitan con un toque
   const chips = () =>
-    filtrosActivos(filtros).map((f) =>
+    filtrosActivos(filtros, marcasDe(perfumes)).map((f) =>
       h(
         "button",
         { type: "button", clase: "chip-activo", "aria-label": `Quitar ${f.etiqueta}`, al: { click: () => cambiar(quitarFiltro(filtros, f)) } },
@@ -388,6 +468,7 @@ function pintar() {
     filtros.genero ? nombreGenero(filtros.genero) : null,
     filtros.categoria ? CATEGORIAS.find((c) => c.clave === filtros.categoria)?.nombre : null,
     ...filtros.aromas.map((a) => FAMILIAS.find((f) => f.clave === a)?.corto),
+    ...(cuantosExtra(filtros) ? ["más filtros"] : []),
   ].filter(Boolean);
   resumen.textContent = n === 1 ? "1 perfume" : `${n} perfumes`;
   barraFijaTexto.textContent = `${resumen.textContent}${partes.length ? "" : " · todo el catálogo"}`;
@@ -410,6 +491,7 @@ buscador.addEventListener("keydown", (e) => {
   }
 });
 orden.addEventListener("change", () => cambiar({ orden: orden.value as Orden }));
+marcaSelect.addEventListener("change", () => cambiar({ marca: marcaSelect.value || null }));
 limpiar.addEventListener("click", () => {
   buscador.value = "";
   cambiar({ ...SIN_FILTROS, orden: filtros.orden });
@@ -470,6 +552,9 @@ cargarCatalogo()
   .then(({ perfumes: lista, origen }) => {
     perfumes = lista;
     cargado = true;
+    // una marca que ya no está en el catálogo (enlace viejo) se ignora
+    if (filtros.marca && !marcasDe(perfumes).some((m) => m.clave === filtros.marca)) filtros = { ...filtros, marca: null };
+    if (cuantosExtra({ ...filtros, presentacion: null })) masFiltros.open = true;
     pintarVitrina();
     portada.conPerfumes(perfumes);
     pintar();

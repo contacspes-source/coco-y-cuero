@@ -88,7 +88,17 @@ describe("conteos", () => {
 
 describe("filtros en la URL", () => {
   test("ida y vuelta", () => {
-    const f: Filtros = { genero: "dama", categoria: "arabes", aromas: ["floral", "dulce"], texto: "yara", orden: "precio-menor" };
+    const f: Filtros = {
+      genero: "dama",
+      categoria: "arabes",
+      aromas: ["floral", "dulce"],
+      texto: "yara",
+      orden: "precio-menor",
+      presentacion: "estuches",
+      precio: "1000-2000",
+      tipos: ["edp", "parfum"],
+      marca: "paco-rabanne",
+    };
     expect(leerFiltros(escribirFiltros(f))).toEqual(f);
   });
   test("sin filtros no ensucia la URL", () => expect(escribirFiltros(SIN_FILTROS)).toBe(""));

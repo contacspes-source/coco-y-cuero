@@ -50,7 +50,7 @@ Requiere Node.js 22 o más nuevo.
 npm install          # una sola vez
 npm run dev          # sitio en http://localhost:5174/
 npm run dev:panel    # panel en http://localhost:5173/panel/
-npm test             # 306 pruebas
+npm test             # 324 pruebas
 npm run build        # revisa tipos, compila y arma dist/
 ```
 
@@ -61,7 +61,7 @@ npm run build        # revisa tipos, compila y arma dist/
 ## Calidad
 
 - **TypeScript estricto**: errores de tipos frenan la compilación.
-- **306 pruebas automáticas**: motor de precios, validación, filtros, ajuste masivo, catálogo con la base caída, estados de pedido, registro de clientes, detalle del perfume, periodos y CSV de reportes, casos de uso con repositorios falsos y regla de capas.
+- **324 pruebas automáticas**: motor de precios, validación, filtros (incluidos estuches, precio, concentración y marca), ajuste masivo, catálogo con la base caída, estados de pedido, registro de clientes, detalle del perfume, periodos y CSV de reportes, casos de uso con repositorios falsos y regla de capas.
 - **74 pruebas de seguridad en la base** (`supabase/pruebas/seguridad.sql`).
 - **GitHub Actions** corre todo en cada push; si algo falla, el commit sale en rojo.
 
@@ -79,8 +79,14 @@ Los filtros viven en la dirección, así que un anuncio puede llevar directo a u
 | Caballero, aroma amaderado | `cocoycuero.com/?genero=caballero&aroma=amaderado#catalogo` |
 | Dulces y florales | `cocoycuero.com/?aroma=dulce,floral#catalogo` |
 | Diseñador, del más barato al más caro | `cocoycuero.com/?categoria=disenador&orden=precio-menor#catalogo` |
+| Estuches de regalo para caballero (Navidad) | `cocoycuero.com/?genero=caballero&presentacion=estuches#catalogo` |
+| Dama, hasta $999 | `cocoycuero.com/?genero=dama&precio=hasta-1000#catalogo` |
+| Todo Paco Rabanne | `cocoycuero.com/?marca=paco-rabanne#catalogo` |
+| Parfum y Extrait (los más intensos) | `cocoycuero.com/?tipo=parfum,extrait#catalogo` |
 
-Valores: `genero` = caballero, dama, unisex · `categoria` = arabes, nicho, disenador · `aroma` = cuero, dulce, floral, amaderado, fresco · `orden` = precio-menor, precio-mayor, nombre · `q` = búsqueda libre. Se pueden agregar parámetros `utm_` sin problema.
+Valores: `genero` = caballero, dama, unisex · `categoria` = arabes, nicho, disenador · `aroma` = cuero, dulce, floral, amaderado, fresco · `presentacion` = estuches, frascos · `precio` = hasta-1000, 1000-2000, 2000-3000, 3000-mas · `tipo` = colonia, edt, edp, parfum, extrait (se combinan con coma) · `marca` = el nombre de la marca en minúsculas y con guiones (paco-rabanne, odyssey-armaf, dolce-gabbana…) · `orden` = precio-menor, precio-mayor, nombre · `q` = búsqueda libre. Se pueden agregar parámetros `utm_` sin problema.
+
+Un perfume cuenta como **estuche** si su nombre lleva la palabra "Estuche" (p. ej. "Bad Boy Estuche 3 piezas"); así aparece solo en el filtro.
 
 ## Ventas: cómo fluye un pedido
 

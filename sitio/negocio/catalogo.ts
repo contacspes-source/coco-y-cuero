@@ -3,7 +3,8 @@
  * (pruebas/sitio.test.ts).
  *
  * Jerarquía de navegación: género → categoría, y encima de eso,
- * filtros por aroma (familia olfativa) y búsqueda libre.
+ * filtros por aroma (familia olfativa) y búsqueda libre. "Más filtros"
+ * agrega presentación (estuches), rango de precio, concentración y marca.
  */
 import type { ClaveCategoria, PerfumePublico } from "../../compartido/tipos";
 import { capitalizar, sinAcentos, slug } from "../../compartido/texto";
@@ -29,6 +30,29 @@ export const FAMILIAS = [
   { clave: "fresco", nombre: "Fresco y cítrico", corto: "Fresco" },
 ] as const;
 
+/** Estuche de regalo o el perfume solo. Se deduce del nombre ("… Estuche 3 piezas"). */
+export const PRESENTACIONES = [
+  { clave: "estuches", nombre: "Estuches de regalo", corto: "Estuches" },
+  { clave: "frascos", nombre: "Solo el perfume", corto: "Solo perfume" },
+] as const;
+
+/** Rangos de precio sobre el precio de cualquiera de sus presentaciones. */
+export const RANGOS_PRECIO = [
+  { clave: "hasta-1000", nombre: "Hasta $999", corto: "Hasta $999", min: 0, max: 1000 },
+  { clave: "1000-2000", nombre: "$1,000 a $1,999", corto: "$1,000–1,999", min: 1000, max: 2000 },
+  { clave: "2000-3000", nombre: "$2,000 a $2,999", corto: "$2,000–2,999", min: 2000, max: 3000 },
+  { clave: "3000-mas", nombre: "$3,000 o más", corto: "$3,000 o más", min: 3000, max: Number.POSITIVE_INFINITY },
+] as const;
+
+/** Concentraciones, de la más ligera a la más intensa. */
+export const CONCENTRACIONES = [
+  { clave: "colonia", tipo: "Colonia", nombre: "Eau de Cologne", corto: "Colonia" },
+  { clave: "edt", tipo: "EDT", nombre: "Eau de Toilette", corto: "EDT" },
+  { clave: "edp", tipo: "EDP", nombre: "Eau de Parfum", corto: "EDP" },
+  { clave: "parfum", tipo: "Parfum", nombre: "Parfum", corto: "Parfum" },
+  { clave: "extrait", tipo: "Extrait", nombre: "Extrait de Parfum", corto: "Extrait" },
+] as const;
+
 export type Orden = "recomendados" | "precio-menor" | "precio-mayor" | "nombre";
 
 export interface Filtros {
@@ -37,9 +61,30 @@ export interface Filtros {
   aromas: string[];
   texto: string;
   orden: Orden;
+  /** "estuches" | "frascos" */
+  presentacion: string | null;
+  /** clave de RANGOS_PRECIO */
+  precio: string | null;
+  /** claves de CONCENTRACIONES; se combinan con "o" */
+  tipos: string[];
+  /** slug de la marca, p. ej. "paco-rabanne" */
+  marca: string | null;
 }
 
-export const SIN_FILTROS: Filtros = { genero: null, categoria: null, aromas: [], texto: "", orden: "recomendados" };
+export const SIN_FILTROS: Filtros = {
+  genero: null,
+  categoria: null,
+  aromas: [],
+  texto: "",
+  orden: "recomendados",
+  presentacion: null,
+  precio: null,
+  tipos: [],
+  marca: null,
+};
+
+/** Grupos que se pueden ignorar al contar (para mostrar "Estuches (12)"). */
+type Grupo = "genero" | "categoria" | "aromas" | "presentacion" | "precio" | "tipos" | "marca";
 
 // ------------------------------------------------------------------
 // Datos derivados de un perfume
@@ -73,6 +118,31 @@ export function familiaPrincipal(p: PerfumePublico): string | null {
   return [...cuenta].sort((a, b) => b[1] - a[1] || orden(a[0]) - orden(b[0]))[0]![0];
 }
 
+export function esEstuche(p: PerfumePublico): boolean {
+  return /\bestuche\b/i.test(sinAcentos(p.nombre));
+}
+
+export function claveDeMarca(marca: string): string {
+  return slug(marca);
+}
+
+export function claveDeTipo(tipo: string): string {
+  return CONCENTRACIONES.find((c) => c.tipo === tipo)?.clave ?? slug(tipo);
+}
+
+export function enRango(p: PerfumePublico, clave: string): boolean {
+  const r = RANGOS_PRECIO.find((x) => x.clave === clave);
+  if (!r) return true;
+  return p.presentaciones.some((x) => x.precio >= r.min && x.precio < r.max);
+}
+
+/** Marcas del catálogo, de la A a la Z, con su clave para la URL. */
+export function marcasDe(perfumes: PerfumePublico[]): { clave: string; nombre: string }[] {
+  const m = new Map<string, string>();
+  for (const p of perfumes) m.set(claveDeMarca(p.marca), p.marca);
+  return [...m].map(([clave, nombre]) => ({ clave, nombre })).sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+}
+
 export function precioDesde(p: PerfumePublico): number | null {
   return p.presentaciones.length ? Math.min(...p.presentaciones.map((x) => x.precio)) : null;
 }
@@ -104,11 +174,15 @@ function coincideAroma(p: PerfumePublico, aromas: string[]): boolean {
   return aromas.some((a) => propias.includes(a));
 }
 
-/** Aplica todos los filtros menos los que se pidan ignorar (para contar). */
-function pasa(p: PerfumePublico, f: Filtros, ignorar: "genero" | "categoria" | "aromas" | null = null): boolean {
+/** Aplica todos los filtros menos el grupo que se pida ignorar (para contar). */
+function pasa(p: PerfumePublico, f: Filtros, ignorar: Grupo | null = null): boolean {
   if (ignorar !== "genero" && f.genero && p.genero !== f.genero) return false;
   if (ignorar !== "categoria" && f.categoria && p.categoria !== f.categoria) return false;
   if (ignorar !== "aromas" && !coincideAroma(p, f.aromas)) return false;
+  if (ignorar !== "presentacion" && f.presentacion && esEstuche(p) !== (f.presentacion === "estuches")) return false;
+  if (ignorar !== "precio" && f.precio && !enRango(p, f.precio)) return false;
+  if (ignorar !== "tipos" && f.tipos.length && !f.tipos.includes(claveDeTipo(p.tipo))) return false;
+  if (ignorar !== "marca" && f.marca && claveDeMarca(p.marca) !== f.marca) return false;
   return coincideTexto(p, f.texto);
 }
 
@@ -133,7 +207,7 @@ export function filtrar(perfumes: PerfumePublico[], f: Filtros): PerfumePublico[
  * los demás filtros. Sirve para mostrar "Nicho (0)" y desactivarlo.
  */
 export function conteos(perfumes: PerfumePublico[], f: Filtros) {
-  const contar = (ignorar: "genero" | "categoria" | "aromas", condicion: (p: PerfumePublico) => boolean) =>
+  const contar = (ignorar: Grupo, condicion: (p: PerfumePublico) => boolean) =>
     perfumes.filter((p) => pasa(p, f, ignorar) && condicion(p)).length;
   return {
     generos: Object.fromEntries([
@@ -147,11 +221,30 @@ export function conteos(perfumes: PerfumePublico[], f: Filtros) {
     aromas: Object.fromEntries(
       FAMILIAS.map((a) => [a.clave, contar("aromas", (p) => familiasDe(p).includes(a.clave))]),
     ) as Record<string, number>,
+    presentaciones: Object.fromEntries(
+      PRESENTACIONES.map((x) => [x.clave, contar("presentacion", (p) => esEstuche(p) === (x.clave === "estuches"))]),
+    ) as Record<string, number>,
+    precios: Object.fromEntries(RANGOS_PRECIO.map((r) => [r.clave, contar("precio", (p) => enRango(p, r.clave))])) as Record<
+      string,
+      number
+    >,
+    tipos: Object.fromEntries(CONCENTRACIONES.map((c) => [c.clave, contar("tipos", (p) => claveDeTipo(p.tipo) === c.clave)])) as Record<
+      string,
+      number
+    >,
+    marcas: Object.fromEntries(
+      marcasDe(perfumes).map((m) => [m.clave, contar("marca", (p) => claveDeMarca(p.marca) === m.clave)]),
+    ) as Record<string, number>,
   };
 }
 
+/** Cuántos de "Más filtros" están puestos (para el letrero del botón). */
+export function cuantosExtra(f: Filtros): number {
+  return (f.presentacion ? 1 : 0) + (f.precio ? 1 : 0) + f.tipos.length + (f.marca ? 1 : 0);
+}
+
 export function hayFiltros(f: Filtros): boolean {
-  return Boolean(f.genero || f.categoria || f.aromas.length || f.texto.trim());
+  return Boolean(f.genero || f.categoria || f.aromas.length || f.texto.trim() || cuantosExtra(f));
 }
 
 // ------------------------------------------------------------------
@@ -166,12 +259,21 @@ export function leerFiltros(busqueda: string): Filtros {
   const categoria = q.get("categoria");
   const orden = q.get("orden") as Orden | null;
   const familias: string[] = FAMILIAS.map((a) => a.clave);
+  const presentacion = q.get("presentacion");
+  const precio = q.get("precio");
+  const tipos: string[] = CONCENTRACIONES.map((c) => c.clave);
+  const marca = q.get("marca");
   return {
     genero: GENEROS.some((g) => g.clave === genero) ? genero : null,
     categoria: CATEGORIAS.some((c) => c.clave === categoria) ? (categoria as ClaveCategoria) : null,
     aromas: (q.get("aroma") ?? "").split(",").filter((a) => familias.includes(a)),
     texto: (q.get("q") ?? "").slice(0, 80),
     orden: orden && ORDENES.includes(orden) ? orden : "recomendados",
+    presentacion: PRESENTACIONES.some((x) => x.clave === presentacion) ? presentacion : null,
+    precio: RANGOS_PRECIO.some((r) => r.clave === precio) ? precio : null,
+    tipos: [...new Set((q.get("tipo") ?? "").split(",").filter((t) => tipos.includes(t)))],
+    // la marca se valida contra el catálogo al pintar; aquí solo la forma
+    marca: marca && /^[a-z0-9-]{1,60}$/.test(marca) ? marca : null,
   };
 }
 
@@ -181,6 +283,10 @@ export function escribirFiltros(f: Filtros): string {
   if (f.genero) q.set("genero", f.genero);
   if (f.categoria) q.set("categoria", f.categoria);
   if (f.aromas.length) q.set("aroma", f.aromas.join(","));
+  if (f.presentacion) q.set("presentacion", f.presentacion);
+  if (f.precio) q.set("precio", f.precio);
+  if (f.tipos.length) q.set("tipo", f.tipos.join(","));
+  if (f.marca) q.set("marca", f.marca);
   if (f.texto.trim()) q.set("q", f.texto.trim());
   if (f.orden !== "recomendados") q.set("orden", f.orden);
   const s = q.toString();
@@ -364,13 +470,27 @@ export type FiltroActivo =
   | { tipo: "genero"; etiqueta: string }
   | { tipo: "categoria"; etiqueta: string }
   | { tipo: "aroma"; clave: string; etiqueta: string }
+  | { tipo: "presentacion"; etiqueta: string }
+  | { tipo: "precio"; etiqueta: string }
+  | { tipo: "concentracion"; clave: string; etiqueta: string }
+  | { tipo: "marca"; etiqueta: string }
   | { tipo: "texto"; etiqueta: string };
 
-export function filtrosActivos(f: Filtros): FiltroActivo[] {
+/**
+ * `marcas` sirve para mostrar el nombre bonito ("Paco Rabanne") en vez
+ * de la clave de la URL; si no se pasa, se usa la clave.
+ */
+export function filtrosActivos(f: Filtros, marcas: { clave: string; nombre: string }[] = []): FiltroActivo[] {
   const r: FiltroActivo[] = [];
   if (f.genero) r.push({ tipo: "genero", etiqueta: GENEROS.find((g) => g.clave === f.genero)?.nombre ?? f.genero });
   if (f.categoria) r.push({ tipo: "categoria", etiqueta: CATEGORIAS.find((c) => c.clave === f.categoria)?.nombre ?? f.categoria });
   for (const a of f.aromas) r.push({ tipo: "aroma", clave: a, etiqueta: FAMILIAS.find((x) => x.clave === a)?.corto ?? a });
+  if (f.presentacion)
+    r.push({ tipo: "presentacion", etiqueta: PRESENTACIONES.find((x) => x.clave === f.presentacion)?.corto ?? f.presentacion });
+  if (f.precio) r.push({ tipo: "precio", etiqueta: RANGOS_PRECIO.find((x) => x.clave === f.precio)?.corto ?? f.precio });
+  for (const t of f.tipos)
+    r.push({ tipo: "concentracion", clave: t, etiqueta: CONCENTRACIONES.find((x) => x.clave === t)?.corto ?? t });
+  if (f.marca) r.push({ tipo: "marca", etiqueta: marcas.find((m) => m.clave === f.marca)?.nombre ?? f.marca });
   if (f.texto.trim()) r.push({ tipo: "texto", etiqueta: `“${f.texto.trim()}”` });
   return r;
 }
@@ -383,6 +503,14 @@ export function quitarFiltro(f: Filtros, chip: FiltroActivo): Filtros {
       return { ...f, categoria: null };
     case "aroma":
       return { ...f, aromas: f.aromas.filter((a) => a !== chip.clave) };
+    case "presentacion":
+      return { ...f, presentacion: null };
+    case "precio":
+      return { ...f, precio: null };
+    case "concentracion":
+      return { ...f, tipos: f.tipos.filter((t) => t !== chip.clave) };
+    case "marca":
+      return { ...f, marca: null };
     case "texto":
       return { ...f, texto: "" };
   }

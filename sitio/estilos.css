@@ -934,3 +934,39 @@ a:focus-visible, button:focus-visible, input:focus-visible{
 .campo-asterisco{color:var(--cuero)}
 .cta-obligatorios{margin:0 0 -4px;font-size:12.5px}
 .campo[hidden]{display:none}
+
+/* ===========================================================
+   Más filtros: precio, concentración y marca (plegable)
+   =========================================================== */
+.mas-filtros{margin:-12px 0 26px}
+.mas-filtros > summary{
+  display:inline-flex;align-items:center;gap:9px;padding:6px 0;cursor:pointer;list-style:none;
+  font-family:var(--display);font-size:13px;letter-spacing:.24em;text-transform:uppercase;color:var(--cuero);
+}
+.mas-filtros > summary::-webkit-details-marker{display:none}
+.mas-filtros > summary::after{
+  content:"";width:7px;height:7px;margin-top:-4px;
+  border-right:1.4px solid currentColor;border-bottom:1.4px solid currentColor;
+  transform:rotate(45deg);transition:transform .18s ease,margin .18s ease;
+}
+.mas-filtros[open] > summary::after{transform:rotate(-135deg);margin-top:4px}
+.mas-filtros > summary:focus-visible{outline:2px solid var(--caramelo);outline-offset:4px;border-radius:4px}
+.mas-filtros-cuenta:empty{display:none}
+.mas-filtros-cuenta{
+  min-width:20px;height:20px;padding:0 6px;border-radius:999px;display:inline-grid;place-items:center;
+  background:var(--ebano);color:var(--crema);font-family:var(--util);font-size:11px;letter-spacing:0;
+}
+.filtros-fila-extra{margin:14px 0 0}
+.pildora-chica{padding:6px 15px;font-size:15px}
+.pildora:disabled{opacity:.4;cursor:default}
+.pildora:disabled:hover{border-color:var(--linea);color:var(--tinta-suave)}
+.marca-select{
+  appearance:none;min-width:220px;padding:9px 36px 9px 16px;border:1px solid var(--linea);border-radius:999px;
+  background:var(--papel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none' stroke='%237a4e32' stroke-width='1.3'%3E%3Cpath d='m1 1 4 4 4-4'/%3E%3C/svg%3E") no-repeat right 15px center;
+  font-family:var(--util);font-size:14px;color:var(--tinta);cursor:pointer;
+}
+.marca-select:focus{outline:none;border-color:var(--caramelo)}
+@media (max-width:620px){
+  .mas-filtros{margin:-4px 0 22px}
+  .marca-select{width:100%}
+}

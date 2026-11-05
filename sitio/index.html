@@ -88,7 +88,29 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       <span class="filtros-titulo" id="aromas-titulo">Aroma</span>
       <div class="aromas-lista" id="aromas" role="group" aria-labelledby="aromas-titulo"></div>
     </div>
+    <div class="filtros-grupo">
+      <span class="filtros-titulo" id="presentaciones-titulo">Presentación</span>
+      <div class="filtros" id="presentaciones" role="group" aria-labelledby="presentaciones-titulo"></div>
+    </div>
   </div>
+
+  <details class="mas-filtros" id="mas-filtros">
+    <summary>Más filtros <span class="mas-filtros-cuenta" id="mas-filtros-cuenta"></span></summary>
+    <div class="filtros-fila filtros-fila-extra">
+      <div class="filtros-grupo">
+        <span class="filtros-titulo" id="precios-titulo">Precio</span>
+        <div class="filtros" id="precios" role="group" aria-labelledby="precios-titulo"></div>
+      </div>
+      <div class="filtros-grupo">
+        <span class="filtros-titulo" id="tipos-titulo">Concentración</span>
+        <div class="filtros" id="tipos" role="group" aria-labelledby="tipos-titulo"></div>
+      </div>
+      <div class="filtros-grupo">
+        <label class="filtros-titulo" for="marca">Marca</label>
+        <select class="marca-select" id="marca"></select>
+      </div>
+    </div>
+  </details>
 
   <div class="resultados">
     <p class="resultados-texto" id="resumen" aria-live="polite"></p>
