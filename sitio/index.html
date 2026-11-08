@@ -73,44 +73,78 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     </div>
     <div class="collage" id="collage" aria-label="Algunos perfumes del catálogo"></div>
   </div>
-  <div class="caja">
-    <nav class="generos" id="generos" aria-label="Para quién"></nav>
-  </div>
 </section>
 
 <main class="caja catalogo">
-  <div class="filtros-fila" id="filtros-fila">
-    <div class="filtros-grupo">
-      <span class="filtros-titulo" id="categorias-titulo">Tipo</span>
-      <div class="filtros" id="categorias" role="group" aria-labelledby="categorias-titulo"></div>
+  <!-- Filtros: una barra cerrada; cada botón abre solo su opción -->
+  <div class="panel-filtros" id="filtros-fila">
+    <div class="panel-barra" role="toolbar" aria-label="Filtros">
+      <span class="panel-titulo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4 2v-8z"/></svg>
+        Filtros
+      </span>
+      <button class="panel-boton" type="button" data-sec="generos" aria-expanded="false" aria-controls="sec-generos"><span>Tipo</span><span class="panel-valor"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+      <button class="panel-boton" type="button" data-sec="categorias" aria-expanded="false" aria-controls="sec-categorias"><span>Categoría</span><span class="panel-valor"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+      <button class="panel-boton" type="button" data-sec="aromas" aria-expanded="false" aria-controls="sec-aromas"><span>Aroma</span><span class="panel-valor"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+      <button class="panel-boton" type="button" data-sec="presentaciones" aria-expanded="false" aria-controls="sec-presentaciones"><span>Presentación</span><span class="panel-valor"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+      <button class="panel-boton" type="button" data-sec="precios" aria-expanded="false" aria-controls="sec-precios"><span>Precio</span><span class="panel-valor"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+      <button class="panel-boton" type="button" data-sec="tipos" aria-expanded="false" aria-controls="sec-tipos"><span>Concentración</span><span class="panel-valor"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+      <button class="panel-boton" type="button" data-sec="marcas" aria-expanded="false" aria-controls="sec-marcas"><span>Marca</span><span class="panel-valor"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+      <span class="panel-cuenta" id="panel-cuenta"></span>
     </div>
-    <div class="filtros-grupo">
-      <span class="filtros-titulo" id="aromas-titulo">Aroma</span>
-      <div class="aromas-lista" id="aromas" role="group" aria-labelledby="aromas-titulo"></div>
-    </div>
-    <div class="filtros-grupo">
-      <span class="filtros-titulo" id="presentaciones-titulo">Presentación</span>
-      <div class="filtros" id="presentaciones" role="group" aria-labelledby="presentaciones-titulo"></div>
-    </div>
-  </div>
 
-  <details class="mas-filtros" id="mas-filtros">
-    <summary>Más filtros <span class="mas-filtros-cuenta" id="mas-filtros-cuenta"></span></summary>
-    <div class="filtros-fila filtros-fila-extra">
-      <div class="filtros-grupo">
-        <span class="filtros-titulo" id="precios-titulo">Precio</span>
-        <div class="filtros" id="precios" role="group" aria-labelledby="precios-titulo"></div>
-      </div>
-      <div class="filtros-grupo">
-        <span class="filtros-titulo" id="tipos-titulo">Concentración</span>
-        <div class="filtros" id="tipos" role="group" aria-labelledby="tipos-titulo"></div>
-      </div>
-      <div class="filtros-grupo">
-        <label class="filtros-titulo" for="marca">Marca</label>
-        <select class="marca-select" id="marca"></select>
-      </div>
-    </div>
-  </details>
+    <div class="panel-cajon" id="panel-cajon"><div>
+      <section class="panel-seccion" id="sec-generos" hidden>
+        <div class="panel-encabezado"><span class="panel-nombre">Tipo</span><span class="panel-detalle">¿Para quién es?</span></div>
+        <div class="fichas-filtro" id="generos" role="group" aria-label="Tipo"></div>
+      </section>
+      <section class="panel-seccion" id="sec-categorias" hidden>
+        <div class="panel-encabezado"><span class="panel-nombre">Categoría</span><span class="panel-detalle">Origen de la casa</span></div>
+        <div class="fichas-filtro" id="categorias" role="group" aria-label="Categoría"></div>
+      </section>
+      <section class="panel-seccion" id="sec-aromas" hidden>
+        <div class="panel-encabezado">
+          <span class="panel-nombre">Aroma</span><span class="panel-detalle">Familia olfativa · puedes elegir varias</span>
+          <button class="panel-listo" type="button" data-cerrar>Listo</button>
+        </div>
+        <div class="ruleta" id="aromas" role="group" aria-label="Aroma">
+          <button class="ruleta-flecha ruleta-izq" type="button" id="aromas-ant" aria-label="Aroma anterior"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+          <button class="ruleta-flecha ruleta-der" type="button" id="aromas-sig" aria-label="Aroma siguiente"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+          <div class="ruleta-escena" id="aromas-escena"><div class="ruleta-rueda" id="aromas-rueda"></div></div>
+          <div class="ruleta-puntos" id="aromas-puntos" aria-hidden="true"></div>
+          <p class="ruleta-ayuda" id="aromas-ayuda" aria-live="polite"></p>
+        </div>
+      </section>
+      <section class="panel-seccion" id="sec-presentaciones" hidden>
+        <div class="panel-encabezado"><span class="panel-nombre">Presentación</span><span class="panel-detalle">Formato del perfume</span></div>
+        <div class="fichas-filtro fichas-tres" id="presentaciones" role="group" aria-label="Presentación"></div>
+      </section>
+      <section class="panel-seccion" id="sec-precios" hidden>
+        <div class="panel-encabezado"><span class="panel-nombre">Precio</span><span class="panel-detalle">MXN · rango</span></div>
+        <div class="fichas-filtro fichas-lisas" id="precios" role="group" aria-label="Precio"></div>
+      </section>
+      <section class="panel-seccion" id="sec-tipos" hidden>
+        <div class="panel-encabezado"><span class="panel-nombre">Concentración</span><span class="panel-detalle">Intensidad y duración</span></div>
+        <div class="fichas-filtro fichas-lisas" id="tipos" role="group" aria-label="Concentración"></div>
+      </section>
+      <section class="panel-seccion" id="sec-marcas" hidden>
+        <div class="panel-encabezado"><span class="panel-nombre">Marca</span><span class="panel-detalle">Casa perfumera</span></div>
+        <div class="marcas-herramientas">
+          <label class="marcas-buscar">
+            <span class="solo-lectores">Buscar marca</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+            <input type="search" id="marcas-buscar" placeholder="Busca una marca" autocomplete="off" enterkeyhint="search">
+          </label>
+          <button class="marcas-todas" type="button" id="marcas-todas" aria-pressed="true">Todas las marcas</button>
+        </div>
+        <div class="marcas-cinta" id="marcas-cinta">
+          <div class="marcas-pista" id="marcas-pista" role="group" aria-label="Marcas"></div>
+        </div>
+        <div class="marcas-encontradas" id="marcas" role="group" aria-label="Marcas encontradas" hidden></div>
+        <p class="marcas-nota" id="marcas-nota">Pasa el mouse o toca para detener la cinta.</p>
+      </section>
+    </div></div>
+  </div>
 
   <div class="resultados">
     <p class="resultados-texto" id="resumen" aria-live="polite"></p>

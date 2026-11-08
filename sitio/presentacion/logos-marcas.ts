@@ -1,0 +1,47 @@
+/**
+ * Logos de marca en /assets/img/marcas/<clave>.webp (una sola tinta,
+ * se colorean con CSS mask). Tamaño en px al doble de resolución; ya
+ * vienen con el mismo "peso" visual, así que se muestran a la misma escala.
+ * Generado desde Instagram Coco y Cuero/logos_marcas_png. Una marca que no
+ * esté aquí se muestra con su nombre en letra.
+ */
+export const LOGOS_MARCAS: Readonly<Record<string, readonly [number, number]>> = {
+  "afnan": [493, 170],
+  "al-haramain": [520, 156],
+  "ariana-grande": [520, 52],
+  "armaf": [171, 170],
+  "azzaro": [520, 63],
+  "bharara": [520, 65],
+  "billie-eilish": [332, 170],
+  "burberry": [160, 170],
+  "bvlgari": [520, 53],
+  "calvin-klein": [174, 170],
+  "carolina-herrera": [520, 20],
+  "christian-dior": [169, 170],
+  "coach": [520, 147],
+  "dolce-gabbana": [520, 51],
+  "french-avenue": [170, 170],
+  "giorgio-armani": [520, 58],
+  "givenchy": [520, 50],
+  "guerlain": [520, 67],
+  "guess": [204, 170],
+  "hugo-boss": [520, 63],
+  "jean-paul-gaultier": [436, 170],
+  "jo-milano-paris": [520, 69],
+  "khadlaj": [141, 170],
+  "lacoste": [354, 170],
+  "lattafa": [129, 170],
+  "michael-kors": [258, 170],
+  "moschino": [520, 139],
+  "nautica": [376, 170],
+  "odyssey-armaf": [520, 59],
+  "paco-rabanne": [520, 95],
+  "prada": [520, 83],
+  "ralph-lauren": [520, 39],
+  "rasasi": [520, 139],
+  "rayhaan": [520, 79],
+  "stallion": [338, 170],
+  "valentino": [414, 170],
+  "versace": [329, 170],
+  "yves-saint-laurent": [520, 93],
+};

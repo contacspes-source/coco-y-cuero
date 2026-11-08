@@ -5,7 +5,7 @@
 import "../estilos.css";
 import { h, vaciar } from "../../compartido/dom";
 import { SUPABASE_URL } from "../../compartido/config";
-import { urlDeFoto, urlDirectaDeFoto, usarFotosPorNuestroDominio } from "../../compartido/texto";
+import { sinAcentos, urlDeFoto, urlDirectaDeFoto, usarFotosPorNuestroDominio } from "../../compartido/texto";
 import type { PerfumePublico } from "../../compartido/tipos";
 import {
   CATEGORIAS,
@@ -15,7 +15,6 @@ import {
   RANGOS_PRECIO,
   claveDeTipo,
   cuantosExtra,
-  esEstuche,
   marcasDe,
   GENEROS,
   SIN_FILTROS,
@@ -31,7 +30,6 @@ import {
   conPerfume,
   leerPerfumeAbierto,
   filtrosActivos,
-  muestras,
   quitarFiltro,
   semillaDelDia,
   sugerenciasDeBusqueda,
@@ -44,6 +42,7 @@ import {
 import { cargarCatalogo, conviene } from "../negocio/servicio";
 import { CONFIG, linkWhatsApp } from "./config";
 import { iconoFamilia, iconoWhatsApp } from "./iconos";
+import { LOGOS_MARCAS } from "./logos-marcas";
 import { abrirApartar, abrirRegistro, estadoBienvenida, iniciarCuenta } from "./cuenta";
 import { vistaDetalle } from "./detalle";
 import { iniciarPortada } from "./portada";
@@ -58,13 +57,22 @@ const conteo = $("conteo");
 const resumen = $("resumen");
 const generos = $("generos");
 const categorias = $("categorias");
-const aromas = $("aromas");
 const presentaciones = $("presentaciones");
 const precios = $("precios");
 const tipos = $("tipos");
-const marcaSelect = $<HTMLSelectElement>("marca");
-const masFiltros = $<HTMLDetailsElement>("mas-filtros");
-const masFiltrosCuenta = $("mas-filtros-cuenta");
+const marcas = $("marcas");
+const marcasCinta = $("marcas-cinta");
+const marcasPista = $("marcas-pista");
+const marcasBuscar = $<HTMLInputElement>("marcas-buscar");
+const marcasTodas = $<HTMLButtonElement>("marcas-todas");
+const marcasNota = $("marcas-nota");
+const panelCuenta = $("panel-cuenta");
+const panelCajon = $("panel-cajon");
+const botonesPanel = [...document.querySelectorAll<HTMLButtonElement>(".panel-boton[data-sec]")];
+const ruletaEscena = $("aromas-escena");
+const ruletaRueda = $("aromas-rueda");
+const ruletaPuntos = $("aromas-puntos");
+const ruletaAyuda = $("aromas-ayuda");
 const buscador = $<HTMLInputElement>("buscador");
 const orden = $<HTMLSelectElement>("orden");
 const limpiar = $<HTMLButtonElement>("limpiar");
@@ -198,154 +206,411 @@ function cambiar(parcial: Partial<Filtros>) {
   if (cargado) pintar();
 }
 
-/** Miniatura redonda de un perfume (para tarjetas de filtro). */
-function miniatura(p: PerfumePublico, clase = "mini"): HTMLElement {
-  const foto = urlDeFoto(p.imagenUrl);
-  return h("span", { clase }, foto ? h("img", { src: foto, alt: "", loading: "lazy", decoding: "async", width: 120, height: 120 }) : null);
+// ------------------------------------------------------------ panel de filtros
+// Una barra cerrada; cada botón abre solo su sección. Las de una sola
+// opción se cierran al elegir; Aroma se queda abierta porque se combinan.
+type Seccion = "generos" | "categorias" | "aromas" | "presentaciones" | "precios" | "tipos" | "marcas";
+let seccionAbierta: Seccion | null = null;
+
+function abrirSeccion(sec: Seccion | null) {
+  seccionAbierta = sec;
+  for (const b of botonesPanel) {
+    const es = b.dataset.sec === sec;
+    b.classList.toggle("abierto", es);
+    b.setAttribute("aria-expanded", String(es));
+  }
+  document.querySelectorAll<HTMLElement>(".panel-seccion").forEach((s) => (s.hidden = s.id !== `sec-${sec}`));
+  panelCajon.classList.toggle("abierto", sec !== null);
+  if (sec === "aromas") requestAnimationFrame(() => medirRuleta(true));
 }
+for (const b of botonesPanel) b.addEventListener("click", () => abrirSeccion(seccionAbierta === b.dataset.sec ? null : (b.dataset.sec as Seccion)));
+document.querySelectorAll<HTMLButtonElement>("[data-cerrar]").forEach((b) => b.addEventListener("click", () => abrirSeccion(null)));
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && seccionAbierta) abrirSeccion(null);
+});
+/** Elegir en un grupo de una sola opción cierra el cajón. */
+const elegirYCerrar = (parcial: Partial<Filtros>) => {
+  cambiar(parcial);
+  setTimeout(() => abrirSeccion(null), 220);
+};
+
+const FOTOS_FILTRO = "/assets/img/filtros/";
+const ICONO_PALOMA = () => {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  p.setAttribute("d", "M5 12l5 5 9-10");
+  svg.append(p);
+  return h("span", { clase: "ff-paloma" }, svg);
+};
+
+/** Ficha de filtro: con foto (frasco) o lisa (solo texto). */
+function fichaFiltro(opciones: { nombre: string; n: number | null; activa: boolean; foto?: string; alClic: () => void; desactivada?: boolean }) {
+  const { nombre, n, activa, foto, alClic, desactivada } = opciones;
+  const cuenta = n === null ? null : `${n} ${n === 1 ? "perfume" : "perfumes"}`;
+  return h(
+    "button",
+    {
+      type: "button",
+      clase: `ff${foto ? " ff-foto" : " ff-lisa"}${activa ? " activa" : ""}`,
+      "aria-pressed": String(activa),
+      disabled: Boolean(desactivada) && !activa,
+      al: { click: alClic },
+    },
+    foto ? h("img", { src: FOTOS_FILTRO + foto, alt: "", loading: "lazy", decoding: "async" }) : null,
+    foto ? h("span", { clase: "ff-velo", "aria-hidden": "true" }) : null,
+    h("span", { clase: "ff-texto" }, h("span", { clase: "ff-nombre" }, nombre), cuenta ? h("span", { clase: "ff-cuenta" }, cuenta) : null),
+    ICONO_PALOMA(),
+  );
+}
+
+// ---- ruleta de aromas (se construye una vez; pintarControles solo la actualiza)
+const N_AROMAS = FAMILIAS.length;
+const PASO = 360 / N_AROMAS;
+const FOTO_AROMA: Record<string, string> = { cuero: "aroma-cuero.webp", dulce: "aroma-dulce.webp", floral: "aroma-floral.webp", amaderado: "aroma-amaderado.webp", fresco: "aroma-fresco.webp" };
+let giro = 0; // tarjeta al frente (puede crecer sin tope; se usa módulo N)
+let arrastre = 0; // desplazamiento mientras se arrastra, en tarjetas
+let anchoTarjeta = 420;
+let radio = 0;
+let seMovio = false;
+const tarjetasAroma: HTMLButtonElement[] = [];
+
+const alFrente = () => ((Math.round(giro + arrastre) % N_AROMAS) + N_AROMAS) % N_AROMAS;
+
+function medirRuleta(sinAnimar = false) {
+  const ancho = ruletaEscena.clientWidth || 900;
+  anchoTarjeta = Math.min(420, Math.max(240, ancho * 0.46));
+  radio = anchoTarjeta / 2 / Math.tan(Math.PI / N_AROMAS) + 10;
+  ruletaEscena.style.setProperty("--w", `${anchoTarjeta}px`);
+  tarjetasAroma.forEach((t, i) => (t.style.transform = `rotateY(${i * PASO}deg) translateZ(${radio}px)`));
+  if (sinAnimar) ruletaRueda.classList.add("sin-animar");
+  pintarRuleta();
+  if (sinAnimar) requestAnimationFrame(() => requestAnimationFrame(() => ruletaRueda.classList.remove("sin-animar")));
+}
+
+function pintarRuleta() {
+  ruletaRueda.style.transform = `translateZ(${-radio}px) rotateY(${-(giro + arrastre) * PASO}deg)`;
+  const frente = alFrente();
+  tarjetasAroma.forEach((t, i) => {
+    let d = Math.abs((((i - (giro + arrastre)) % N_AROMAS) + N_AROMAS) % N_AROMAS);
+    d = Math.min(d, N_AROMAS - d);
+    t.style.setProperty("--sombra", String(Math.min(0.72, d * 0.3)));
+    t.classList.toggle("frente", i === frente);
+    t.tabIndex = i === frente ? 0 : -1;
+  });
+  [...ruletaPuntos.children].forEach((p, i) => {
+    p.classList.toggle("act", i === frente);
+    p.classList.toggle("sel", filtros.aromas.includes(FAMILIAS[i]!.clave));
+  });
+  const f = FAMILIAS[frente]!;
+  ruletaAyuda.textContent = filtros.aromas.includes(f.clave) ? `${f.corto} · seleccionado, toca para quitar` : `${f.corto} · toca para seleccionar`;
+}
+
+function irAAroma(i: number) {
+  let d = i - alFrente();
+  if (d > N_AROMAS / 2) d -= N_AROMAS;
+  if (d < -N_AROMAS / 2) d += N_AROMAS;
+  giro += d;
+  pintarRuleta();
+}
+
+function alternarAroma(clave: string) {
+  const activo = filtros.aromas.includes(clave);
+  cambiar({ aromas: activo ? filtros.aromas.filter((a) => a !== clave) : [...filtros.aromas, clave] });
+}
+
+function iniciarRuleta() {
+  vaciar(
+    ruletaRueda,
+    ...FAMILIAS.map((f, i) => {
+      const t = h(
+        "button",
+        {
+          type: "button",
+          clase: "ruleta-tarjeta",
+          dataset: { familia: f.clave },
+          "aria-pressed": "false",
+          al: {
+            click: () => {
+              if (seMovio) return;
+              if (alFrente() === i) alternarAroma(f.clave);
+              else irAAroma(i);
+            },
+          },
+        },
+        h("img", { src: FOTOS_FILTRO + (FOTO_AROMA[f.clave] ?? ""), alt: "", loading: "lazy", decoding: "async" }),
+        h("span", { clase: "ruleta-sombra", "aria-hidden": "true" }),
+        h("span", { clase: "ruleta-texto" }, h("span", { clase: "ruleta-nombre" }, f.corto), h("span", { clase: "ruleta-cuenta" })),
+        ICONO_PALOMA(),
+      );
+      tarjetasAroma.push(t);
+      return t;
+    }),
+  );
+  vaciar(ruletaPuntos, ...FAMILIAS.map((_, i) => h("i", { al: { click: () => irAAroma(i) } })));
+  $("aromas-ant").addEventListener("click", () => { giro--; pintarRuleta(); });
+  $("aromas-sig").addEventListener("click", () => { giro++; pintarRuleta(); });
+
+  // arrastrar con el dedo o el mouse
+  let x0: number | null = null;
+  ruletaEscena.addEventListener("pointerdown", (e) => { x0 = e.clientX; seMovio = false; ruletaRueda.classList.add("sin-animar"); });
+  ruletaEscena.addEventListener("pointermove", (e) => {
+    if (x0 === null) return;
+    const dx = e.clientX - x0;
+    if (Math.abs(dx) > 5) seMovio = true;
+    arrastre = -dx / anchoTarjeta;
+    pintarRuleta();
+  });
+  const soltar = () => {
+    if (x0 === null) return;
+    giro = Math.round(giro + arrastre);
+    arrastre = 0;
+    x0 = null;
+    ruletaRueda.classList.remove("sin-animar");
+    pintarRuleta();
+    setTimeout(() => (seMovio = false), 0);
+  };
+  document.addEventListener("pointerup", soltar);
+  document.addEventListener("pointercancel", soltar);
+  // rueda del mouse (una tarjeta por gesto)
+  let ultimaRueda = 0;
+  ruletaEscena.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const ahora = Date.now();
+    if (ahora - ultimaRueda < 350) return;
+    const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    if (Math.abs(d) < 8) return;
+    ultimaRueda = ahora;
+    giro += d > 0 ? 1 : -1;
+    pintarRuleta();
+  }, { passive: false });
+  // teclado, solo con la sección abierta
+  document.addEventListener("keydown", (e) => {
+    if (seccionAbierta !== "aromas" || (e.target instanceof HTMLElement && e.target.matches("input,select,textarea"))) return;
+    if (e.key === "ArrowLeft") { giro--; pintarRuleta(); }
+    if (e.key === "ArrowRight") { giro++; pintarRuleta(); }
+  });
+  window.addEventListener("resize", () => { if (seccionAbierta === "aromas") medirRuleta(true); });
+}
+iniciarRuleta();
+
+// ---- marcas: cinta infinita de logos
+// La pista lleva las marcas dos veces y se desliza de 0 a -50 %, así el
+// giro no tiene corte. Se detiene con el mouse encima, con el foco dentro
+// o unos segundos después de tocarla. Si se escribe en el buscador, la
+// cinta se oculta y aparecen solo las marcas que coinciden, quietas.
+const FOTOS_MARCAS = "/assets/img/marcas/";
+let marcasHuella = "";
+
+function fichaMarca(m: { clave: string; nombre: string }, copia: boolean): HTMLButtonElement {
+  const logo = LOGOS_MARCAS[m.clave];
+  const b = h(
+    "button",
+    {
+      type: "button",
+      clase: "marca",
+      dataset: { marca: m.clave },
+      "aria-label": m.nombre,
+      "aria-hidden": copia ? "true" : null,
+      tabindex: copia ? "-1" : null,
+      al: {
+        click: () => {
+          marcasBuscar.value = "";
+          elegirYCerrar({ marca: filtros.marca === m.clave ? null : m.clave });
+        },
+      },
+    },
+    h(
+      "span",
+      { clase: "marca-caja", "aria-hidden": "true" },
+      logo ? h("span", { clase: "marca-logo" }) : h("span", { clase: "marca-nombre" }, m.nombre),
+    ),
+    h("span", { clase: "marca-cuenta", "aria-hidden": "true" }),
+  );
+  if (logo) {
+    const span = b.querySelector<HTMLElement>(".marca-logo")!;
+    span.style.setProperty("--logo", `url("${FOTOS_MARCAS}${m.clave}.webp")`);
+    // los archivos vienen al doble; se muestran a un tercio para que todos pesen igual
+    span.style.width = `${Math.round(logo[0] * 0.34)}px`;
+    span.style.height = `${Math.round(logo[1] * 0.34)}px`;
+  }
+  return b;
+}
+
+function actualizarFichaMarca(b: HTMLElement, n: number) {
+  const clave = b.dataset.marca ?? "";
+  const activa = filtros.marca === clave;
+  b.classList.toggle("activa", activa);
+  b.classList.toggle("vacia", n === 0 && !activa);
+  if (b.getAttribute("aria-hidden") !== "true") b.setAttribute("aria-pressed", String(activa));
+  b.querySelector(".marca-cuenta")!.textContent = `${n} ${n === 1 ? "perfume" : "perfumes"}`;
+}
+
+function pintarMarcas(lista: { clave: string; nombre: string }[], cuentas: Record<string, number>) {
+  // la pista se arma una sola vez por catálogo: rehacerla reiniciaría el giro
+  const huella = lista.map((m) => m.clave).join("|");
+  if (huella !== marcasHuella) {
+    marcasHuella = huella;
+    vaciar(marcasPista, ...lista.map((m) => fichaMarca(m, false)), ...lista.map((m) => fichaMarca(m, true)));
+    marcasCinta.style.setProperty("--duracion", `${Math.max(24, lista.length * 2.4)}s`);
+  }
+  marcasPista.querySelectorAll<HTMLElement>(".marca").forEach((b) => actualizarFichaMarca(b, cuentas[b.dataset.marca ?? ""] ?? 0));
+  marcasTodas.classList.toggle("activa", filtros.marca === null);
+  marcasTodas.setAttribute("aria-pressed", String(filtros.marca === null));
+
+  // búsqueda: lista quieta con lo que coincide
+  const q = sinAcentos(marcasBuscar.value.trim());
+  const buscando = q.length > 0;
+  marcasCinta.hidden = buscando;
+  marcas.hidden = !buscando;
+  marcasNota.textContent = buscando ? "" : "Pasa el mouse o toca para detener la cinta.";
+  if (buscando) {
+    const hallazgos = lista.filter((m) => sinAcentos(m.nombre).includes(q));
+    vaciar(
+      marcas,
+      ...(hallazgos.length
+        ? hallazgos.map((m) => {
+            const b = fichaMarca(m, false);
+            actualizarFichaMarca(b, cuentas[m.clave] ?? 0);
+            return b;
+          })
+        : [h("p", { clase: "marcas-sin" }, "No tenemos esa marca todavía. Escríbenos por WhatsApp y la conseguimos.")]),
+    );
+  }
+}
+
+marcasBuscar.addEventListener("input", () => { if (cargado) pintar(); });
+marcasBuscar.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
+  const primera = marcas.querySelector<HTMLButtonElement>(".marca");
+  primera?.click();
+});
+marcasTodas.addEventListener("click", () => {
+  marcasBuscar.value = "";
+  elegirYCerrar({ marca: null });
+});
+// en pantallas táctiles, tocar la cinta la detiene unos segundos
+let reanudar: number | undefined;
+marcasCinta.addEventListener("pointerdown", (e) => {
+  if (e.pointerType === "mouse") return;
+  marcasCinta.classList.add("pausada");
+  clearTimeout(reanudar);
+  reanudar = window.setTimeout(() => marcasCinta.classList.remove("pausada"), 4000);
+});
 
 function pintarControles() {
   const c = conteos(perfumes, filtros);
 
-  // género: tarjetas con fotos de referencia
+  // tipo (para quién): "Todos" lisa, los demás con un frasco de referencia
   vaciar(
     generos,
-    ...[{ clave: null as string | null, nombre: "Todos", texto: "Todo el catálogo" }, ...GENEROS.map((g) => ({ clave: g.clave as string | null, nombre: g.nombre, texto: `Para ${g.nombre.toLowerCase()}` }))].map((g, i) => {
-      const activo = filtros.genero === g.clave;
-      const n = c.generos[g.clave ?? "todos"] ?? 0;
-      const fotos = muestras(perfumes, (p) => g.clave === null || p.genero === g.clave, 3, SEMILLA + i);
-      return h(
-        "button",
-        {
-          type: "button",
-          clase: `genero${activo ? " activo" : ""}`,
-          "aria-pressed": String(activo),
-          disabled: n === 0 && !activo,
-          al: { click: () => cambiar({ genero: activo && g.clave !== null ? null : g.clave }) },
-        },
-        h("span", { clase: "genero-fotos", "aria-hidden": "true" }, fotos.map((p) => miniatura(p))),
-        h("span", { clase: "genero-texto" }, h("span", { clase: "genero-nombre" }, g.nombre), h("span", { clase: "genero-cuenta" }, `${n} ${n === 1 ? "perfume" : "perfumes"}`)),
-      );
-    }),
+    fichaFiltro({ nombre: "Todos", n: c.generos.todos ?? 0, activa: filtros.genero === null, alClic: () => elegirYCerrar({ genero: null }) }),
+    ...GENEROS.map((g) =>
+      fichaFiltro({
+        nombre: g.nombre,
+        n: c.generos[g.clave] ?? 0,
+        activa: filtros.genero === g.clave,
+        foto: `${g.clave}.webp`,
+        desactivada: (c.generos[g.clave] ?? 0) === 0,
+        alClic: () => elegirYCerrar({ genero: filtros.genero === g.clave ? null : g.clave }),
+      }),
+    ),
   );
 
-  // tipo: píldoras con una foto; las vacías no se muestran (aparecen solas cuando haya)
+  // categoría: las vacías no se muestran (aparecen solas cuando haya)
   vaciar(
     categorias,
-    ...[{ clave: null, nombre: "Todos" } as const, ...CATEGORIAS]
-      .filter((cat) => cat.clave === null || (c.categorias[cat.clave] ?? 0) > 0 || filtros.categoria === cat.clave)
-      .map((cat) => {
-        const n = c.categorias[cat.clave ?? "todas"] ?? 0;
-        const activa = filtros.categoria === cat.clave;
-        const foto = cat.clave ? muestras(perfumes, (p) => p.categoria === cat.clave, 1, SEMILLA + 7)[0] : undefined;
-        return h(
-          "button",
-          {
-            type: "button",
-            clase: `pildora${activa ? " activa" : ""}`,
-            "aria-pressed": String(activa),
-            al: { click: () => cambiar({ categoria: activa && cat.clave !== null ? null : cat.clave }) },
-          },
-          foto ? miniatura(foto, "mini mini-pildora") : null,
-          cat.nombre,
-          h("span", { clase: "pildora-cuenta" }, String(n)),
-        );
+    fichaFiltro({ nombre: "Todas", n: c.categorias.todas ?? 0, activa: filtros.categoria === null, alClic: () => elegirYCerrar({ categoria: null }) }),
+    ...CATEGORIAS.filter((cat) => (c.categorias[cat.clave] ?? 0) > 0 || filtros.categoria === cat.clave).map((cat) =>
+      fichaFiltro({
+        nombre: cat.singular,
+        n: c.categorias[cat.clave] ?? 0,
+        activa: filtros.categoria === cat.clave,
+        foto: `${cat.clave}.webp`,
+        alClic: () => elegirYCerrar({ categoria: filtros.categoria === cat.clave ? null : cat.clave }),
       }),
+    ),
   );
 
-  // aroma: cada familia con su color
-  vaciar(
-    aromas,
-    ...FAMILIAS.map((f) => {
-      const activo = filtros.aromas.includes(f.clave);
-      const n = c.aromas[f.clave] ?? 0;
-      return h(
-        "button",
-        {
-          type: "button",
-          clase: `aroma${activo ? " activo" : ""}`,
-          dataset: { familia: f.clave },
-          "aria-pressed": String(activo),
-          disabled: n === 0 && !activo,
-          title: f.nombre,
-          al: {
-            click: () =>
-              cambiar({ aromas: activo ? filtros.aromas.filter((a) => a !== f.clave) : [...filtros.aromas, f.clave] }),
-          },
-        },
-        iconoFamilia(f.clave),
-        f.corto,
-        h("span", { clase: "aroma-cuenta" }, String(n)),
-      );
-    }),
-  );
+  // aroma: la ruleta ya existe; solo se actualizan cuentas y selección
+  tarjetasAroma.forEach((t, i) => {
+    const f = FAMILIAS[i]!;
+    const n = c.aromas[f.clave] ?? 0;
+    const activo = filtros.aromas.includes(f.clave);
+    t.classList.toggle("activa", activo);
+    t.classList.toggle("vacia", n === 0 && !activo);
+    t.setAttribute("aria-pressed", String(activo));
+    t.querySelector(".ruleta-cuenta")!.textContent = `${n} ${n === 1 ? "perfume" : "perfumes"}`;
+  });
+  pintarRuleta();
 
   // presentación: estuches de regalo o solo el perfume
   vaciar(
     presentaciones,
-    ...[{ clave: null, nombre: "Todas", corto: "Todas" } as const, ...PRESENTACIONES]
-      .filter((x) => x.clave === null || (c.presentaciones[x.clave] ?? 0) > 0 || filtros.presentacion === x.clave)
-      .map((x) => {
-        const activa = filtros.presentacion === x.clave;
-        const n = x.clave ? (c.presentaciones[x.clave] ?? 0) : null;
-        const foto = x.clave === "estuches" ? muestras(perfumes, esEstuche, 1, SEMILLA + 11)[0] : undefined;
-        return h(
-          "button",
-          {
-            type: "button",
-            clase: `pildora${activa ? " activa" : ""}`,
-            "aria-pressed": String(activa),
-            al: { click: () => cambiar({ presentacion: activa && x.clave !== null ? null : x.clave }) },
-          },
-          foto ? miniatura(foto, "mini mini-pildora") : null,
-          x.nombre,
-          n === null ? null : h("span", { clase: "pildora-cuenta" }, String(n)),
-        );
+    fichaFiltro({ nombre: "Todas", n: null, activa: filtros.presentacion === null, alClic: () => elegirYCerrar({ presentacion: null }) }),
+    ...PRESENTACIONES.filter((x) => (c.presentaciones[x.clave] ?? 0) > 0 || filtros.presentacion === x.clave).map((x) =>
+      fichaFiltro({
+        nombre: x.nombre,
+        n: c.presentaciones[x.clave] ?? 0,
+        activa: filtros.presentacion === x.clave,
+        foto: `${x.clave}.webp`,
+        alClic: () => elegirYCerrar({ presentacion: filtros.presentacion === x.clave ? null : x.clave }),
       }),
+    ),
   );
 
-  // más filtros: precio, concentración y marca
-  const pildoraChica = (texto: string, activa: boolean, n: number, alClic: () => void) =>
-    h(
-      "button",
-      {
-        type: "button",
-        clase: `pildora pildora-chica${activa ? " activa" : ""}`,
-        "aria-pressed": String(activa),
-        disabled: n === 0 && !activa,
-        al: { click: alClic },
-      },
-      texto,
-      h("span", { clase: "pildora-cuenta" }, String(n)),
-    );
+  // precio
   vaciar(
     precios,
-    ...RANGOS_PRECIO.map((r) => {
-      const activa = filtros.precio === r.clave;
-      return pildoraChica(r.nombre, activa, c.precios[r.clave] ?? 0, () => cambiar({ precio: activa ? null : r.clave }));
-    }),
+    fichaFiltro({ nombre: "Cualquiera", n: null, activa: filtros.precio === null, alClic: () => elegirYCerrar({ precio: null }) }),
+    ...RANGOS_PRECIO.map((r) =>
+      fichaFiltro({
+        nombre: r.nombre,
+        n: c.precios[r.clave] ?? 0,
+        activa: filtros.precio === r.clave,
+        desactivada: (c.precios[r.clave] ?? 0) === 0,
+        alClic: () => elegirYCerrar({ precio: filtros.precio === r.clave ? null : r.clave }),
+      }),
+    ),
   );
+
+  // concentración: se combinan, así que no cierra el cajón
   const tiposEnCatalogo = new Set(perfumes.map((p) => claveDeTipo(p.tipo)));
   vaciar(
     tipos,
+    fichaFiltro({ nombre: "Todas", n: null, activa: filtros.tipos.length === 0, alClic: () => elegirYCerrar({ tipos: [] }) }),
     ...CONCENTRACIONES.filter((t) => tiposEnCatalogo.has(t.clave) || filtros.tipos.includes(t.clave)).map((t) => {
       const activa = filtros.tipos.includes(t.clave);
-      return pildoraChica(t.corto, activa, c.tipos[t.clave] ?? 0, () =>
-        cambiar({ tipos: activa ? filtros.tipos.filter((x) => x !== t.clave) : [...filtros.tipos, t.clave] }),
-      );
+      return fichaFiltro({
+        nombre: t.corto,
+        n: c.tipos[t.clave] ?? 0,
+        activa,
+        desactivada: (c.tipos[t.clave] ?? 0) === 0,
+        alClic: () => cambiar({ tipos: activa ? filtros.tipos.filter((x) => x !== t.clave) : [...filtros.tipos, t.clave] }),
+      });
     }),
   );
-  vaciar(
-    marcaSelect,
-    h("option", { value: "" }, "Todas las marcas"),
-    ...marcasDe(perfumes).map((m) => {
-      const n = c.marcas[m.clave] ?? 0;
-      return h("option", { value: m.clave, disabled: n === 0 && filtros.marca !== m.clave }, `${m.nombre} (${n})`);
-    }),
-  );
-  marcaSelect.value = filtros.marca ?? "";
-  const extra = cuantosExtra({ ...filtros, presentacion: null });
-  masFiltrosCuenta.textContent = extra ? String(extra) : "";
+
+  // marca: cinta de logos que corre sola (o lista filtrada si se busca)
+  const listaMarcas = marcasDe(perfumes);
+  pintarMarcas(listaMarcas, c.marcas);
+
+  // la barra muestra lo elegido en cada botón
+  const valores: Record<Seccion, string> = {
+    generos: filtros.genero ? nombreGenero(filtros.genero) : "",
+    categorias: CATEGORIAS.find((x) => x.clave === filtros.categoria)?.singular ?? "",
+    aromas: filtros.aromas.length ? `${FAMILIAS.find((f) => f.clave === filtros.aromas[0])?.corto ?? ""}${filtros.aromas.length > 1 ? ` +${filtros.aromas.length - 1}` : ""}` : "",
+    presentaciones: PRESENTACIONES.find((x) => x.clave === filtros.presentacion)?.corto ?? "",
+    precios: RANGOS_PRECIO.find((x) => x.clave === filtros.precio)?.corto ?? "",
+    tipos: filtros.tipos.map((t) => CONCENTRACIONES.find((x) => x.clave === t)?.corto ?? t).join(", "),
+    marcas: listaMarcas.find((m) => m.clave === filtros.marca)?.nombre ?? "",
+  };
+  for (const b of botonesPanel) {
+    const v = valores[b.dataset.sec as Seccion];
+    b.querySelector(".panel-valor")!.textContent = v ? `· ${v}` : "";
+    b.classList.toggle("lleno", Boolean(v));
+  }
 
   if (buscador.value !== filtros.texto && document.activeElement !== buscador) buscador.value = filtros.texto;
   orden.value = filtros.orden;
@@ -471,6 +736,7 @@ function pintar() {
     ...(cuantosExtra(filtros) ? ["más filtros"] : []),
   ].filter(Boolean);
   resumen.textContent = n === 1 ? "1 perfume" : `${n} perfumes`;
+  panelCuenta.textContent = resumen.textContent;
   barraFijaTexto.textContent = `${resumen.textContent}${partes.length ? "" : " · todo el catálogo"}`;
 
   vacio.hidden = n > 0;
@@ -491,7 +757,6 @@ buscador.addEventListener("keydown", (e) => {
   }
 });
 orden.addEventListener("change", () => cambiar({ orden: orden.value as Orden }));
-marcaSelect.addEventListener("change", () => cambiar({ marca: marcaSelect.value || null }));
 limpiar.addEventListener("click", () => {
   buscador.value = "";
   cambiar({ ...SIN_FILTROS, orden: filtros.orden });
@@ -554,7 +819,6 @@ cargarCatalogo()
     cargado = true;
     // una marca que ya no está en el catálogo (enlace viejo) se ignora
     if (filtros.marca && !marcasDe(perfumes).some((m) => m.clave === filtros.marca)) filtros = { ...filtros, marca: null };
-    if (cuantosExtra({ ...filtros, presentacion: null })) masFiltros.open = true;
     pintarVitrina();
     portada.conPerfumes(perfumes);
     pintar();
