@@ -5,7 +5,7 @@
 -- Supabase y ejecútalo. Todo corre dentro de una transacción que
 -- termina en ROLLBACK, así que NO deja datos de prueba.
 --
--- Resultado esperado: las 84 filas con estado = 'OK' (la numeración salta del 8 al 11).
+-- Resultado esperado: las 99 filas con estado = 'OK' (la numeración salta del 8 al 11).
 -- Si alguna dice 'FALLA', no publiques el cambio que hiciste.
 --
 -- Córrelas cada vez que toques una política RLS, un GRANT o una
@@ -523,6 +523,100 @@ begin
   begin perform public.eliminar_perfume((select min(id) from public.perfume)); r := 'BORRO';
   exception when insufficient_privilege then r := 'bloqueado'; end;
   reset role; insert into _p values (86,'cliente borra un perfume','bloqueado',r);
+end $$;
+
+-- ===== 017 · pagos, descuentos y venta directa =====
+do $$
+declare v bigint; pago bigint; r text; pres bigint; beto bigint; i bigint;
+begin
+  select pr.id into pres from public.presentacion pr join public.perfume pe on pe.id = pr.perfume_id
+   where pe.publicado order by pr.id limit 1;
+  select id into beto from public.cliente where auth_user_id = 'bbbbbbbb-0000-0000-0000-000000000002';
+
+  -- el admin registra un pedido con 10 % y anticipo
+  perform set_config('request.jwt.claims','{"sub":"cccccccc-0000-0000-0000-000000000003","role":"authenticated"}', true);
+  set local role authenticated;
+  v := public.crear_pedido_admin(beto, pres, 1000, 100, 300, 'transferencia');
+  reset role;
+  select (estado || ' ' || precio_pactado::int || ' ' || descuento::int || ' ' || anticipo::int) into r from public.pedido where id = v;
+  insert into _p values (87,'alta en panel con descuento y anticipo','apartado 900 100 300',r);
+
+  -- un segundo pago suma; el saldo baja
+  set local role authenticated;
+  pago := public.registrar_pago(v, 200, 'efectivo', 'en la entrega');
+  reset role;
+  select (anticipo::int || ' ' || saldo::int || ' ' || json_array_length(pagos)) into r from public.pedido_detalle where id = v;
+  insert into _p values (88,'abono suma al pagado','500 400 2',r);
+
+  -- no se puede pagar más que el saldo
+  set local role authenticated;
+  begin perform public.registrar_pago(v, 401, 'efectivo'); r := 'ACEPTO';
+  exception when raise_exception then r := 'bloqueado'; end;
+  reset role; insert into _p values (89,'pago mayor que el saldo','bloqueado',r);
+
+  -- forma de pago inválida
+  set local role authenticated;
+  begin perform public.registrar_pago(v, 10, 'bitcoin'); r := 'ACEPTO';
+  exception when check_violation then r := 'bloqueado'; end;
+  reset role; insert into _p values (90,'forma de pago inventada','bloqueado',r);
+
+  -- borrar un pago lo descuenta
+  set local role authenticated;
+  perform public.eliminar_pago(pago);
+  reset role;
+  select anticipo::int::text into r from public.pedido where id = v;
+  insert into _p values (91,'borrar pago lo descuenta','300',r);
+
+  -- desde la API el anticipo ya no se escribe a mano
+  set local role authenticated;
+  begin update public.pedido set anticipo = 900 where id = v; r := 'LO CAMBIO';
+  exception when insufficient_privilege then r := 'bloqueado'; end;
+  reset role; insert into _p values (92,'admin escribe anticipo directo','bloqueado',r);
+
+  -- primer pago de una solicitud la aparta
+  set local role authenticated;
+  i := public.crear_pedido_admin(beto, pres, 800);
+  perform public.registrar_pago(i, 100, 'efectivo');
+  reset role;
+  select estado into r from public.pedido where id = i;
+  insert into _p values (93,'primer pago aparta la solicitud','apartado',r);
+
+  -- venta directa: nace entregada, pagada y con costo
+  set local role authenticated;
+  i := public.crear_pedido_admin(beto, pres, 1200, 0, 1200, 'efectivo', true);
+  reset role;
+  select (p.estado || ' ' || (p.precio_pactado - p.anticipo)::int || ' ' || (pc.pedido_id is not null or privado.costo_vigente(pres) is null)::text
+          || ' ' || (select count(*) from public.pedido_evento e where e.pedido_id = p.id and e.estado = 'entregado'))
+    into r from public.pedido p left join public.pedido_costo pc on pc.pedido_id = p.id where p.id = i;
+  insert into _p values (94,'venta directa entregada y pagada','entregado 0 true 1',r);
+
+  -- venta directa sin pagar completo: no
+  set local role authenticated;
+  begin perform public.crear_pedido_admin(beto, pres, 1200, 0, 500, 'efectivo', true); r := 'ACEPTO';
+  exception when raise_exception then r := 'bloqueado'; end;
+  reset role; insert into _p values (95,'venta directa a medio pagar','bloqueado',r);
+
+  -- el cliente no ve, no registra ni borra pagos
+  perform set_config('request.jwt.claims','{"sub":"bbbbbbbb-0000-0000-0000-000000000002","role":"authenticated"}', true);
+  set local role authenticated;
+  select count(*) into i from public.pedido_pago;
+  reset role; insert into _p values (96,'cliente lee pagos','0',i::text); set local role authenticated;
+  select coalesce(json_array_length(pagos), 0)::text into r from public.pedido_detalle where id = v;
+  reset role; insert into _p values (97,'cliente ve pagos en la vista','0',r); set local role authenticated;
+  begin perform public.registrar_pago(v, 10, 'efectivo'); r := 'REGISTRO';
+  exception when insufficient_privilege then r := 'bloqueado'; end;
+  reset role; insert into _p values (98,'cliente registra un pago','bloqueado',r); set local role authenticated;
+  begin insert into public.pedido_pago (pedido_id, monto, forma) values (v, 10, 'efectivo'); r := 'INSERTO';
+  exception when insufficient_privilege then r := 'bloqueado'; end;
+  reset role; insert into _p values (99,'cliente inserta pago directo','bloqueado',r); set local role authenticated;
+  begin perform public.crear_pedido_admin(beto, pres, 1); r := 'CREO';
+  exception when insufficient_privilege then r := 'bloqueado'; end;
+  reset role; insert into _p values (100,'cliente usa el alta del panel','bloqueado',r);
+
+  set local role anon;
+  begin perform public.registrar_pago(v, 10, 'efectivo'); r := 'REGISTRO';
+  exception when insufficient_privilege then r := 'bloqueado'; end;
+  reset role; insert into _p values (101,'anon registra un pago','bloqueado',r);
 end $$;
 
 select n, prueba, esperado, obtenido,

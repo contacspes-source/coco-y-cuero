@@ -46,6 +46,7 @@ img{display:block}
 
 .caja{width:100%;max-width:1140px;margin:0 auto;padding:0 28px}
 .angosta{max-width:660px}
+.solo-movil{display:none}
 .solo-lectores{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
 /* etiqueta en versalitas con tracking, del kit */
@@ -279,6 +280,10 @@ main.catalogo{padding-top:44px;padding-bottom:84px}
   .cuenta-crear .cuenta-crear-promo{display:none}
   .cuenta-boton{padding:8px 14px;font-size:15px}
 }
+@media (max-width:440px){
+  /* el nombre no cabe junto a los botones: queda el sello */
+  .marca-texto{display:none}
+}
 .cuenta-boton.con-sesion{background:var(--ebano);border-color:var(--ebano);color:var(--crema);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cuenta-hola strong{font-weight:500}
 
@@ -398,11 +403,16 @@ html.con-hoja{overflow:hidden}
   margin:26px 0 0;padding:16px 18px;border-radius:var(--radio-chico);
   background:var(--arena);color:#5d4635;font-size:13.5px;line-height:1.6;
 }
-.det-pie{margin-top:16px}
+.det-encabezado{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.det-encabezado .ficha-marca{margin:0}
 .det-compartir{
-  border:0;background:none;padding:0;cursor:pointer;font:inherit;font-size:13.5px;
-  color:var(--cuero);text-decoration:underline;text-underline-offset:3px;
+  display:inline-flex;align-items:center;gap:7px;flex:none;max-width:60%;
+  padding:7px 14px;border-radius:999px;border:1px solid var(--linea);background:var(--papel);cursor:pointer;
+  font:inherit;font-size:13.5px;color:var(--cuero);transition:border-color .18s ease,background .18s ease;
 }
+.det-compartir span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.det-compartir:hover{border-color:var(--caramelo);background:#fff}
+.det-compartir svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .det-similares{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
 .det-similar{display:flex;flex-direction:column;gap:2px;text-decoration:none;color:inherit}
 .det-similar img,.det-similar-vacio{
@@ -436,6 +446,10 @@ html.con-hoja{overflow:hidden}
 .con-error input,.con-error select,.con-error textarea{border-color:#a2462b}
 .cta-error{margin:0;color:#a2462b;font-size:13.5px}
 .cta-error:empty{display:none}
+.cta-error-accion{display:block;margin-top:6px;font-size:13.5px}
+.cta-error-acciones{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.cta-error-acciones .boton{padding:9px 16px;font-size:15px}
+.cta-seguir{display:block;margin:2px auto 0;font-size:14px}
 .cta-nota{margin:0;font-size:12.5px;color:var(--tinta-suave)}
 .cta-cambio{margin:0;font-size:14px;color:var(--tinta-suave)}
 .boton-ancho{width:100%;justify-content:center}
@@ -532,13 +546,17 @@ a:focus-visible, button:focus-visible, input:focus-visible{
   .hoja-cuerpo,.hoja-angosta .hoja-cuerpo{padding:64px 20px 40px}
   .hoja-cerrar{top:calc(6dvh + 10px);right:12px}
   .detalle{grid-template-columns:1fr;gap:20px}
-  .det-foto{position:relative;top:auto;aspect-ratio:4/3;margin-top:0}
+  .det-foto{position:relative;top:auto;aspect-ratio:1;margin-top:0}
   .det-precio{font-size:30px}
   .det-acciones{grid-template-columns:1fr}
   .det-similares{grid-template-columns:repeat(2,1fr)}
   .cta-dos{grid-template-columns:1fr}
   .cta-titulo{font-size:30px}
   .rejilla{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  /* la etiqueta tapaba el frasco: en el celular la categoría va en el texto */
+  .ficha-foto .etiqueta{display:none}
+  .solo-movil{display:inline}
+  .ficha-foto{padding:4px}
   .ficha-cuerpo{padding:14px 14px 16px}
   .ficha-detalle{font-size:11.5px}
   .familia span{font-size:11.5px}
@@ -710,6 +728,7 @@ a:focus-visible, button:focus-visible, input:focus-visible{
 .panel-boton:focus-visible{outline:2px solid var(--caramelo);outline-offset:2px}
 .panel-valor{font-family:var(--display);font-size:16.5px;font-weight:500}
 .panel-valor:empty{display:none}
+.panel-botones{display:contents}
 .panel-cuenta{margin-left:auto;font-family:var(--display);font-size:18px;color:#e9dccb;white-space:nowrap}
 
 .panel-cajon{display:grid;grid-template-rows:0fr;transition:grid-template-rows .4s cubic-bezier(.22,.9,.3,1)}
@@ -738,19 +757,19 @@ a:focus-visible, button:focus-visible, input:focus-visible{
 }
 .ff:focus-visible{outline:2px solid var(--caramelo);outline-offset:2px}
 .ff:disabled{opacity:.4;cursor:default}
-.ff-foto{aspect-ratio:0.8}
-.ff-foto img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;transition:transform .5s ease}
+.ff-foto img{display:block;width:100%;aspect-ratio:0.8;object-fit:cover;object-position:center;transition:transform .5s ease}
 .ff-foto:hover{transform:translateY(-3px);box-shadow:0 16px 36px rgba(0,0,0,.5)}
-.ff-foto:hover img{transform:scale(1.05)}
-.ff-velo{position:absolute;inset:0;background:linear-gradient(180deg,rgba(20,12,7,0) 40%,rgba(20,12,7,.85) 100%)}
-.ff-foto .ff-texto{position:absolute;left:0;right:0;bottom:0;padding:12px 14px}
+.ff-foto:hover img{transform:scale(1.04)}
+.ff-velo{display:none}
+/* el nombre va en una banda bajo la foto: nunca encima del frasco */
+.ff-foto .ff-texto{display:block;padding:11px 14px 13px;border-top:1px solid rgba(255,255,255,.06);background:#2a1b11}
 .ff-nombre{display:block;font-family:var(--display);font-size:20px;line-height:1.1}
 .ff-cuenta{display:block;margin-top:2px;font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;color:#d9c3ab}
 .ff-lisa{align-self:start;min-height:74px;background:linear-gradient(135deg,#3a2718,#2a1b11)}
 .ff-lisa .ff-texto{display:block;padding:18px 20px}
 .ff-lisa .ff-nombre{font-size:21px}
 .ff.activa{outline:2px solid var(--crema);outline-offset:-2px}
-.ff-foto.activa .ff-velo{background:linear-gradient(180deg,rgba(20,12,7,0) 30%,rgba(248,241,232,.9) 100%)}
+.ff-foto.activa .ff-texto{background:linear-gradient(135deg,#f8f1e8,#e6d5c4)}
 .ff-lisa.activa{background:linear-gradient(135deg,#f8f1e8,#e6d5c4)}
 .ff.activa .ff-nombre{color:var(--ebano)}
 .ff.activa .ff-cuenta{color:#5a4433}
@@ -860,11 +879,22 @@ a:focus-visible, button:focus-visible, input:focus-visible{
 .ruleta-ayuda{margin:6px 0 0;text-align:center;font-size:12px;letter-spacing:.03em;color:#9d8468}
 
 @media (max-width:760px){
-  .panel-barra{padding:14px}
-  .panel-titulo{width:100%;font-size:22px}
-  .panel-cuenta{width:100%;margin-left:0}
-  .panel-boton{font-size:13px;padding:8px 12px 8px 13px}
-  .fichas-filtro,.fichas-tres,.fichas-lisas{grid-template-columns:repeat(2,1fr)}
+  /* título y conteo arriba; los botones en una sola fila que se desliza */
+  .panel-barra{padding:14px 0 12px;gap:10px 0}
+  .panel-titulo{order:1;margin:0 0 0 16px;font-size:22px}
+  .panel-cuenta{order:2;margin:0 16px 0 auto;font-size:17px}
+  .panel-botones{
+    order:3;display:flex;gap:8px;width:100%;overflow-x:auto;scrollbar-width:none;
+    padding:2px 16px 4px;scroll-padding:0 16px;
+    -webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent);
+  }
+  .panel-botones::-webkit-scrollbar{display:none}
+  .panel-boton{flex:none;font-size:13.5px;padding:9px 12px 9px 14px}
+  .panel-seccion{padding:16px 14px 20px}
+  .fichas-filtro,.fichas-tres,.fichas-lisas{grid-template-columns:repeat(2,1fr);gap:8px}
+  .ff-nombre{font-size:18px}
+  .ff-foto .ff-texto{padding:9px 11px 11px}
+  .ff-lisa .ff-texto{padding:14px 14px}
   .ruleta-escena{height:150px}
   .ruleta-izq{left:8px}.ruleta-der{right:8px}
   .marca{min-width:128px;height:94px;padding:8px 14px}

@@ -7,6 +7,7 @@ import { avisar, campo, conBotonOcupado, h, marcarErrores, vaciar } from "../../
 import { urlDeFoto } from "../../compartido/texto";
 import type { PerfumePublico } from "../../compartido/tipos";
 import {
+  ErrorDeDatos,
   ESTADOS_DE_MEXICO,
   ESTADO_CLIENTE,
   ErrorDeValidacion,
@@ -280,21 +281,110 @@ function camposDireccion(inicial: Direccion, ciudad: HTMLSelectElement, siempre 
   return { nodo, leer };
 }
 
-async function manejar(form: HTMLFormElement, error: HTMLElement, boton: HTMLButtonElement, texto: string, tarea: () => Promise<void>) {
-  error.textContent = "";
+async function manejar(
+  form: HTMLFormElement,
+  error: HTMLElement,
+  boton: HTMLButtonElement,
+  texto: string,
+  tarea: () => Promise<void>,
+  /** acciones para ofrecer junto al error (p. ej. "Reenviar correo") */
+  acciones?: (e: unknown) => Node[],
+) {
+  vaciar(error);
   marcarErrores(form, []);
   try {
     await conBotonOcupado(boton, texto, tarea);
   } catch (e) {
     if (e instanceof ErrorDeValidacion) marcarErrores(form, e.problemas);
-    else error.textContent = mensaje(e);
+    else vaciar(error, document.createTextNode(mensaje(e)), ...(acciones?.(e) ?? []));
   }
 }
 
+const esDe = (e: unknown, cosa: "duplicado" | "sin-confirmar") =>
+  e instanceof ErrorDeDatos && (cosa === "duplicado" ? e.tipo === "duplicado" : e.pista === "correo_sin_confirmar");
+
+// ------------------------------------------------------------ confirmar correo
+const ESPERA_REENVIO_S = 60;
+
+/**
+ * "Revisa tu correo" con la opción de reenviarlo. Supabase deja mandar
+ * uno por minuto por correo, así que el botón espera 60 s entre envíos.
+ */
+function pintarConfirmacion(hoja: Hoja, correo: string, continuar?: () => void, recienEnviado = true) {
+  const cajaCaptcha = h("div", { clase: "captcha" });
+  const captcha = montarCaptcha(cajaCaptcha);
+  const error = errorGeneral();
+  const reenviar = h("button", { clase: "boton boton-oscuro boton-ancho", type: "button" }, "Reenviar correo");
+  let reloj: number | undefined;
+  const esperar = (s: number) => {
+    clearInterval(reloj);
+    let faltan = s;
+    const tic = () => {
+      if (!reenviar.isConnected || faltan <= 0) {
+        clearInterval(reloj);
+        reenviar.disabled = false;
+        reenviar.textContent = "Reenviar correo";
+        return;
+      }
+      reenviar.disabled = true;
+      reenviar.textContent = `Reenviar correo en ${faltan} s`;
+      faltan--;
+    };
+    tic();
+    reloj = window.setInterval(tic, 1000);
+  };
+  reenviar.addEventListener("click", async () => {
+    vaciar(error);
+    try {
+      await conBotonOcupado(reenviar, "Enviando…", async () => {
+        const token = await captcha.token();
+        try {
+          await cuenta.reenviarConfirmacion(correo, volverAqui(), token);
+        } finally {
+          captcha.reiniciar();
+        }
+      });
+      avisar(`Te lo volvimos a mandar a ${correo}.`, "exito");
+      esperar(ESPERA_REENVIO_S);
+    } catch (e) {
+      error.textContent = e instanceof ErrorDeValidacion ? e.problemas.map((p) => p.mensaje).join(" ") : mensaje(e);
+    }
+  });
+
+  hoja.pintar(
+    ...encabezado(
+      "Revisa tu correo",
+      `Te mandamos un enlace a ${correo} para confirmar tu cuenta. Ábrelo desde este mismo teléfono o computadora.`,
+    ),
+    h("p", { clase: "cta-nota" }, "¿No llega? Revisa spam o promociones; puede tardar un par de minutos."),
+    cajaCaptcha,
+    error,
+    reenviar,
+    h(
+      "p",
+      { clase: "cta-cambio" },
+      "¿Escribiste mal tu correo? ",
+      h("button", { type: "button", clase: "enlace", al: { click: () => void abrirRegistro(continuar) } }, "Corrígelo"),
+    ),
+    h(
+      "a",
+      {
+        clase: "boton boton-linea boton-ancho",
+        href: linkWhatsApp(`Hola, me registré en Coco & Cuero con ${correo} y no me llega el correo de confirmación.`),
+        target: "_blank",
+        rel: "noopener",
+      },
+      "No me llega: escribir por WhatsApp",
+    ),
+    h("button", { clase: "enlace cta-seguir", type: "button", al: { click: cerrarHoja } }, "Seguir viendo perfumes"),
+  );
+  if (recienEnviado) esperar(ESPERA_REENVIO_S);
+}
+
 // ------------------------------------------------------------ entrar
-export function abrirEntrar(continuar?: () => void, aviso?: string) {
+export function abrirEntrar(continuar?: () => void, aviso?: string, correo = "") {
   const hoja = abrirHoja({ etiqueta: "Entrar a mi cuenta", clase: "hoja-angosta" });
-  const correoIn = h("input", { type: "email", autocomplete: "email", inputmode: "email", required: true });
+  const correoIn = h("input", { type: "email", autocomplete: "email", inputmode: "email", required: true, value: correo });
   const clave = h("input", { type: "password", autocomplete: "current-password", required: true });
   const error = errorGeneral();
   const boton = h("button", { clase: "boton boton-oscuro boton-ancho", type: "submit" }, "Entrar");
@@ -302,14 +392,31 @@ export function abrirEntrar(continuar?: () => void, aviso?: string) {
   const captcha = montarCaptcha(cajaCaptcha);
   // cada token de Turnstile sirve una sola vez: tras cada intento se pide otro
   const conCaptcha = (texto: string, tarea: (token: string) => Promise<void>) =>
-    manejar(form, error, boton, texto, async () => {
-      const token = await captcha.token();
-      try {
-        await tarea(token);
-      } finally {
-        captcha.reiniciar();
-      }
-    });
+    manejar(
+      form,
+      error,
+      boton,
+      texto,
+      async () => {
+        const token = await captcha.token();
+        try {
+          await tarea(token);
+        } finally {
+          captcha.reiniciar();
+        }
+      },
+      // se registró pero no confirmó: ofrecer el correo otra vez
+      (e) =>
+        esDe(e, "sin-confirmar")
+          ? [
+              h(
+                "button",
+                { type: "button", clase: "enlace cta-error-accion", al: { click: () => pintarConfirmacion(hoja, correoIn.value.trim().toLowerCase(), continuar, false) } },
+                "Reenviar el correo de confirmación",
+              ),
+            ]
+          : [],
+    );
   const form: HTMLFormElement = h(
     "form",
     {
@@ -355,7 +462,7 @@ export function abrirEntrar(continuar?: () => void, aviso?: string) {
     form,
     h("p", { clase: "cta-cambio" }, "¿Primera vez? ", h("button", { type: "button", clase: "enlace", al: { click: () => abrirRegistro(continuar) } }, "Crea tu cuenta")),
   );
-  queueMicrotask(() => correoIn.focus());
+  queueMicrotask(() => (correo ? clave : correoIn).focus());
 }
 
 // ------------------------------------------------------------ registro
@@ -426,17 +533,33 @@ export async function abrirRegistro(continuar?: () => void) {
               throw e;
             }
             if (r.requiereConfirmacion) {
-              hoja.pintar(
-                ...encabezado("Revisa tu correo", `Te mandamos un enlace a ${correoIn.value.trim()} para confirmar tu cuenta. Ábrelo desde este mismo teléfono o computadora.`),
-                h("p", { clase: "cta-nota" }, "¿No llega? Revisa spam o promociones. Puede tardar un par de minutos."),
-                h("button", { clase: "boton boton-linea boton-ancho", type: "button", al: { click: cerrarHoja } }, "Seguir viendo perfumes"),
-              );
+              pintarConfirmacion(hoja, correoIn.value.trim().toLowerCase(), continuar);
             } else {
               await refrescarSesion();
               avisar("¡Bienvenido a Coco & Cuero!", "exito");
               if (continuar) continuar();
               else abrirMiCuenta();
             }
+          }, (e) => {
+            // ya tiene cuenta: llevarlo a entrar o a recuperar su contraseña
+            if (!esDe(e, "duplicado")) return [];
+            const correo = correoIn.value.trim().toLowerCase();
+            return [
+              h(
+                "span",
+                { clase: "cta-error-acciones" },
+                h("button", { type: "button", clase: "boton boton-oscuro", al: { click: () => abrirEntrar(continuar, `Ya tienes cuenta con ${correo}. Entra con tu contraseña.`, correo) } }, "Entrar con ese correo"),
+                h(
+                  "button",
+                  {
+                    type: "button",
+                    clase: "boton boton-linea",
+                    al: { click: () => abrirEntrar(continuar, "Escribe tu correo y toca «¿Olvidaste tu contraseña?» para crear una nueva.", correo) },
+                  },
+                  "Olvidé mi contraseña",
+                ),
+              ),
+            ];
           });
         },
       },

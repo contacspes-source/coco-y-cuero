@@ -246,6 +246,7 @@ describe("ServicioCuenta", () => {
     entrar: async (...a: unknown[]) => void llamadas.push(["entrar", ...a]),
     salir: async () => {},
     recuperar: async () => {},
+    reenviarConfirmacion: async (...a: unknown[]) => void llamadas.push(["reenviar", ...a]),
     cambiarContrasena: async () => {},
     alCambiar: async () => {},
     canales: async () => [],
@@ -265,6 +266,13 @@ describe("ServicioCuenta", () => {
   test("el registro viaja limpio", async () => {
     await s.registrar(registro({ correo: " Ana@Correo.MX ", telefono: "+52 33 1234 5678", nombre: " Ana   Martínez " }), "/", "tok");
     expect(llamadas.at(-1)![1]).toMatchObject({ correo: "ana@correo.mx", telefono: "3312345678", nombre: "Ana Martínez" });
+  });
+
+  test("reenviar la confirmación valida el correo y lo manda en minúsculas", async () => {
+    await expect(s.reenviarConfirmacion("no-es-correo", "/", "t")).rejects.toThrow();
+    llamadas.length = 0;
+    await s.reenviarConfirmacion("  Ana@Correo.COM ", "https://x/", "tok");
+    expect(llamadas).toEqual([["reenviar", "ana@correo.com", "https://x/", "tok"]]);
   });
 
   test("el token del CAPTCHA llega al repositorio en registro y login", async () => {

@@ -5,7 +5,7 @@
 import "../estilos.css";
 import { h, vaciar } from "../../compartido/dom";
 import { SUPABASE_URL } from "../../compartido/config";
-import { sinAcentos, urlDeFoto, urlDirectaDeFoto, usarFotosPorNuestroDominio } from "../../compartido/texto";
+import { idDeRutaDePerfume, rutaDePerfume, sinAcentos, urlDeFoto, urlDirectaDeFoto, usarFotosPorNuestroDominio } from "../../compartido/texto";
 import type { PerfumePublico } from "../../compartido/tipos";
 import {
   CATEGORIAS,
@@ -86,6 +86,14 @@ const barraFijaChips = $("barra-fija-chips");
 const SEMILLA = semillaDelDia(new Date());
 
 let perfumes: PerfumePublico[] = [];
+// Enlace para compartir (/p/123-lattafa-asad): el Worker ya puso la vista
+// previa para WhatsApp y redes; aquí se pasa a la forma de siempre
+// (?perfume=123) para que la tienda abra ese perfume.
+{
+  const id = idDeRutaDePerfume(location.pathname);
+  if (id !== null) history.replaceState(null, "", `/?perfume=${id}${location.hash}`);
+}
+
 let filtros: Filtros = leerFiltros(location.search);
 
 const pesos = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 });
@@ -93,7 +101,7 @@ const nombreGenero = (clave: string) => GENEROS.find((g) => g.clave === clave)?.
 
 // ------------------------------------------------------------ detalle
 const enlaceDe = (p: PerfumePublico) => `${location.pathname}${conPerfume(location.search, p.id)}`;
-const enlaceCompleto = (p: PerfumePublico) => `${location.origin}/?perfume=${p.id}`;
+const enlaceCompleto = (p: PerfumePublico) => `${location.origin}${rutaDePerfume(p)}`;
 
 function abrirDetalle(p: PerfumePublico, empujar = true) {
   if (empujar && leerPerfumeAbierto(location.search) !== p.id) {
@@ -168,7 +176,8 @@ function tarjeta(p: PerfumePublico): HTMLElement {
           p.nombre,
         ),
       ),
-      h("p", { clase: "ficha-detalle" }, detalle),
+      // en el celular la etiqueta de la foto se oculta (tapaba el frasco) y la categoría pasa aquí
+      h("p", { clase: "ficha-detalle" }, detalle, h("span", { clase: "solo-movil" }, ` · ${categoria}`)),
       notas ? h("p", { clase: "familia" }, iconoFamilia(familia), h("span", null, notas)) : null,
       h(
         "div",

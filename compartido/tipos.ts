@@ -174,13 +174,34 @@ export interface PedidoAdmin {
   marca: string | null;
   imagenUrl: string | null;
   historial: { estado: EstadoPedido; fecha: string }[];
+  /** Cobros registrados (solo admin). Su suma es `anticipo`. */
+  pagos: PagoPedido[];
 }
+
+export type FormaPago = "efectivo" | "transferencia" | "tarjeta" | "deposito" | "otro";
+
+export interface PagoPedido {
+  id: number;
+  monto: number;
+  forma: FormaPago;
+  nota: string | null;
+  fecha: string;
+}
+
+/** Cómo llega el pedido al registrarlo en el panel. */
+export type PagoInicial = "nada" | "anticipo" | "completo" | "venta-directa";
 
 export interface NuevoPedido {
   clienteId: number | null;
   presentacionId: number | null;
-  precioPactado: number;
+  /** Precio de catálogo antes del descuento. */
+  precioLista: number;
+  /** Pesos que se descuentan (p. ej. 10 % de bienvenida). */
+  descuento: number;
+  pagoInicial: PagoInicial;
+  /** Solo cuenta con pagoInicial = "anticipo". */
   anticipo: number;
+  formaPago: FormaPago | null;
   ciudadEntrega: string;
   notas: string;
   notaInterna: string;
@@ -188,8 +209,9 @@ export interface NuevoPedido {
 
 export interface CambiosDePedido {
   estado?: EstadoPedido;
-  anticipo?: number;
+  /** Precio final (ya con descuento). */
   precioPactado?: number;
+  descuento?: number;
   ciudadEntrega?: string | null;
   notas?: string | null;
 }

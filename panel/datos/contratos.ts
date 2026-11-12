@@ -7,6 +7,7 @@ import type {
   CambioDePrecio,
   CambiosDePedido,
   Catalogos,
+  FormaPago,
   ClienteAdmin,
   ClienteEditable,
   NuevoPedido,
@@ -58,7 +59,10 @@ export interface RepositorioVentas {
   darDeBajaCliente(clienteId: number): Promise<void>;
   reactivarCliente(clienteId: number): Promise<void>;
   listarPedidos(): Promise<PedidoAdmin[]>;
+  /** `anticipo` ya trae lo que se cobra al registrar (0, anticipo o el total). */
   crearPedido(p: NuevoPedido): Promise<number>;
+  registrarPago(pedidoId: number, monto: number, forma: FormaPago, nota: string): Promise<void>;
+  eliminarPago(pagoId: number): Promise<void>;
   actualizarPedido(id: number, cambios: CambiosDePedido): Promise<void>;
   guardarNotaInterna(pedidoId: number, nota: string | null): Promise<void>;
   /** null borra el costo registrado. */

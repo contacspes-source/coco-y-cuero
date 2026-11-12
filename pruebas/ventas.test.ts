@@ -3,6 +3,7 @@ import type { CambiosDePedido, ClienteAdmin, ClienteEditable, NuevoPedido, Pedid
 import type { RepositorioVentas } from "../panel/datos/contratos";
 import { ErrorDeValidacion } from "../panel/negocio/errores";
 import {
+  duplicadosPorTelefono,
   ServicioVentas,
   advertenciaAlAvanzar,
   anticipoSugerido,
@@ -17,6 +18,11 @@ import {
   validarCliente,
   validarNuevoPedido,
   gananciaDe,
+  descuentoBienvenida,
+  esPrimeraCompra,
+  pagoInicialDe,
+  validarCambios,
+  validarPago,
 } from "../panel/negocio/ventas";
 
 function pedido(p: Partial<PedidoAdmin> & { id: number }): PedidoAdmin {
@@ -45,6 +51,7 @@ function pedido(p: Partial<PedidoAdmin> & { id: number }): PedidoAdmin {
     marca: "Lattafa",
     imagenUrl: null,
     historial: [],
+    pagos: [],
     ...p,
   };
 }
@@ -120,8 +127,11 @@ describe("validación", () => {
   const nuevo = (n: Partial<NuevoPedido> = {}): NuevoPedido => ({
     clienteId: 1,
     presentacionId: 10,
-    precioPactado: 1000,
-    anticipo: 0,
+    precioLista: 1000,
+    descuento: 0,
+    pagoInicial: "nada",
+    anticipo: Number.NaN,
+    formaPago: null,
     ciudadEntrega: "",
     notas: "",
     notaInterna: "",
@@ -131,8 +141,18 @@ describe("validación", () => {
 
   test("pedido completo", () => expect(campos(nuevo())).toEqual([]));
   test("falta cliente y perfume", () => expect(campos(nuevo({ clienteId: null, presentacionId: null }))).toEqual(["cliente", "presentacion"]));
-  test("anticipo mayor que precio", () => expect(campos(nuevo({ anticipo: 1200 }))).toEqual(["anticipo"]));
-  test("precio cero", () => expect(campos(nuevo({ precioPactado: 0 }))).toEqual(["precio"]));
+  test("anticipo igual o mayor que el precio final: que elija pagó completo", () =>
+    expect(campos(nuevo({ pagoInicial: "anticipo", anticipo: 900, descuento: 100, formaPago: "efectivo" }))).toEqual(["anticipo"]));
+  test("anticipo sin monto", () => expect(campos(nuevo({ pagoInicial: "anticipo", formaPago: "efectivo" }))).toEqual(["anticipo"]));
+  test("con pago hay que decir cómo pagó", () => expect(campos(nuevo({ pagoInicial: "completo" }))).toEqual(["forma"]));
+  test("precio cero", () => expect(campos(nuevo({ precioLista: 0 }))).toEqual(["precio"]));
+  test("descuento del tamaño del precio", () => expect(campos(nuevo({ descuento: 1000 }))).toEqual(["descuento"]));
+  test("lo que se cobra al registrar", () => {
+    expect(pagoInicialDe(nuevo({ descuento: 100 }))).toBe(0);
+    expect(pagoInicialDe(nuevo({ pagoInicial: "anticipo", anticipo: 300 }))).toBe(300);
+    expect(pagoInicialDe(nuevo({ pagoInicial: "completo", descuento: 100 }))).toBe(900);
+    expect(pagoInicialDe(nuevo({ pagoInicial: "venta-directa", descuento: 100, anticipo: 5 }))).toBe(900);
+  });
 
   const cli = (c: Partial<ClienteEditable> = {}): ClienteEditable => ({ nombre: "Ana", telefono: "", direccion: "", ciudad: "", canalId: null, ...c });
   test("cliente sin teléfono es válido (llegó en persona)", () => expect(validarCliente(cli())).toEqual([]));
@@ -187,6 +207,9 @@ describe("ServicioVentas", () => {
     async reactivarCliente(id: number) { this.bajas = this.bajas.filter((x) => x !== id); }
     async listarPedidos() { return []; }
     async crearPedido(p: NuevoPedido) { this.creados.push(p); return 1; }
+    pagos: [number, number, string, string][] = [];
+    async registrarPago(id: number, monto: number, forma: string, nota: string) { this.pagos.push([id, monto, forma, nota]); }
+    async eliminarPago() {}
     async actualizarPedido(id: number, c: CambiosDePedido) { this.cambios.push([id, c]); }
     async guardarNotaInterna(id: number, n: string | null) { this.notas.push([id, n]); }
     costos: [number, number | null][] = [];
@@ -232,16 +255,79 @@ describe("ServicioVentas", () => {
     expect(repo.notas).toEqual([[2, "adiós"]]);
   });
 
-  test("anticipo mayor que el precio no llega a la base", async () => {
+  test("el precio no baja de lo ya pagado", async () => {
     const repo = new Falso();
     const s = new ServicioVentas(repo);
-    await expect(s.guardarCambios(pedido({ id: 3 }), { anticipo: 5000 })).rejects.toBeInstanceOf(ErrorDeValidacion);
+    await expect(s.guardarCambios(pedido({ id: 3, anticipo: 800, saldo: 200 }), { precioPactado: 700, descuento: 300 })).rejects.toBeInstanceOf(ErrorDeValidacion);
     expect(repo.cambios).toEqual([]);
+    await s.guardarCambios(pedido({ id: 3, anticipo: 500, saldo: 500 }), { precioPactado: 900, descuento: 100 });
+    expect(repo.cambios).toEqual([[3, { precioPactado: 900, descuento: 100 }]]);
+  });
+
+  test("pagos: valida y 'pagó todo' cobra el saldo", async () => {
+    const repo = new Falso();
+    const s = new ServicioVentas(repo);
+    const p = pedido({ id: 8, estado: "apartado", anticipo: 300, saldo: 700 });
+    await expect(s.registrarPago(p, 800, "efectivo")).rejects.toBeInstanceOf(ErrorDeValidacion);
+    await expect(s.registrarPago(p, 100, null)).rejects.toBeInstanceOf(ErrorDeValidacion);
+    await s.registrarPago(p, 200, "transferencia", "  ref 123 ");
+    await s.liquidar(p, "efectivo");
+    expect(repo.pagos).toEqual([[8, 200, "transferencia", "ref 123"], [8, 700, "efectivo", ""]]);
+  });
+
+  test("alta: manda el cobro calculado y sin forma si no pagó", async () => {
+    const repo = new Falso();
+    const s = new ServicioVentas(repo);
+    const base: NuevoPedido = { clienteId: 1, presentacionId: 10, precioLista: 1000, descuento: 100, pagoInicial: "venta-directa", anticipo: Number.NaN, formaPago: "tarjeta", ciudadEntrega: " Zamora ", notas: "", notaInterna: "" };
+    await s.crearPedido(base);
+    await s.crearPedido({ ...base, pagoInicial: "nada" });
+    expect(repo.creados.map((n) => [n.anticipo, n.formaPago, n.ciudadEntrega])).toEqual([[900, "tarjeta", "Zamora"], [0, null, "Zamora"]]);
   });
 
   test("el teléfono del cliente se guarda normalizado", async () => {
     const repo = new Falso();
     await new ServicioVentas(repo).guardarCliente({ nombre: " Ana   Martínez ", telefono: "+52 33 1234 5678", direccion: "", ciudad: "", canalId: null });
     expect(repo.clientes[0]).toMatchObject({ nombre: "Ana Martínez", telefono: "3312345678" });
+  });
+});
+
+describe("descuento y pagos", () => {
+  test("10 % de bienvenida redondeado a decenas, como en la página", () => {
+    expect(descuentoBienvenida(1000)).toBe(100);
+    expect(descuentoBienvenida(1290)).toBe(130); // 1161 → 1160
+    expect(descuentoBienvenida(0)).toBe(0);
+  });
+
+  test("primera compra: no cuentan los cancelados ni el pedido que se edita", () => {
+    const ps = [pedido({ id: 1, clienteId: 5, estado: "cancelado" }), pedido({ id: 2, clienteId: 5 })];
+    expect(esPrimeraCompra(5, ps)).toBe(false);
+    expect(esPrimeraCompra(5, ps, 2)).toBe(true);
+    expect(esPrimeraCompra(6, ps)).toBe(true);
+    expect(esPrimeraCompra(null, ps)).toBe(false);
+  });
+
+  test("validar pago", () => {
+    const p = { estado: "apartado" as const, saldo: 500 };
+    expect(validarPago(p, 500, "efectivo")).toEqual([]);
+    expect(validarPago(p, 0, "efectivo").map((x) => x.campo)).toEqual(["monto"]);
+    expect(validarPago({ estado: "cancelado", saldo: 500 }, 100, "efectivo").map((x) => x.campo)).toEqual(["monto"]);
+  });
+
+  test("descuento negativo", () =>
+    expect(validarCambios({ precioPactado: 1000, anticipo: 0 }, { descuento: -5 }).map((x) => x.campo)).toEqual(["descuento"]));
+});
+
+describe("duplicados por WhatsApp", () => {
+  test("marca a los que comparten número, sin importar el formato", () => {
+    const d = duplicadosPorTelefono([
+      { id: 1, numeroCliente: 101, telefono: "33 1234 5678", activo: true },
+      { id: 2, numeroCliente: 102, telefono: "+52 3312345678", activo: true },
+      { id: 3, numeroCliente: 103, telefono: "3399999999", activo: true },
+      { id: 4, numeroCliente: 104, telefono: "3312345678", activo: false },
+    ]);
+    expect(d.get(1)).toEqual(["#102"]);
+    expect(d.get(2)).toEqual(["#101"]);
+    expect(d.has(3)).toBe(false);
+    expect(d.has(4)).toBe(false); // los dados de baja no cuentan
   });
 });

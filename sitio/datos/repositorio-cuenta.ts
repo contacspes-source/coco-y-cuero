@@ -124,7 +124,30 @@ export class RepositorioCuenta {
       }
       throw traducirError(error);
     }
+    // Con "confirmar correo" activo, Supabase no avisa si el correo ya
+    // tiene cuenta (para no revelar quién está registrado): responde
+    // como si nada y no manda ningún correo. La señal es que el usuario
+    // regresa sin identidades.
+    if (data.user && !data.session && (data.user.identities?.length ?? 1) === 0) {
+      throw new ErrorDeDatos("duplicado", "Ese correo ya tiene una cuenta en Coco & Cuero.");
+    }
     return { requiereConfirmacion: !data.session };
+  }
+
+  /** Vuelve a mandar el correo para confirmar la cuenta. */
+  async reenviarConfirmacion(correo: string, volverA: string, captcha: string): Promise<void> {
+    const db = await supabase();
+    const { error } = await db.auth.resend({
+      type: "signup",
+      email: correo,
+      options: { emailRedirectTo: volverA, captchaToken: captcha || undefined },
+    });
+    if (!error) return;
+    const codigo = (error as { code?: string }).code ?? "";
+    if ((error as { status?: number }).status === 429 || /rate limit|security purposes|over_email_send_rate_limit/i.test(`${error.message} ${codigo}`)) {
+      throw new ErrorDeDatos("red", "Ya te mandamos uno hace un momento. Espera un minuto y vuelve a intentarlo.");
+    }
+    throw traducirError(error);
   }
 
   async entrar(correo: string, contrasena: string, captcha: string): Promise<void> {

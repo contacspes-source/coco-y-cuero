@@ -3,7 +3,9 @@ import type {
   ClienteAdmin,
   ClienteEditable,
   EstadoPedido,
+  FormaPago,
   NuevoPedido,
+  PagoPedido,
   PedidoAdmin,
   Rol,
 } from "../../compartido/tipos";
@@ -46,6 +48,9 @@ function aPedido(f: Record<string, unknown>): PedidoAdmin {
     marca: texto(f.marca),
     imagenUrl: texto(f.imagen_url),
     historial: (f.historial as PedidoAdmin["historial"] | null) ?? [],
+    pagos: ((f.pagos as Record<string, unknown>[] | null) ?? []).map(
+      (x): PagoPedido => ({ id: num(x.id), monto: num(x.monto), forma: x.forma as FormaPago, nota: texto(x.nota), fecha: String(x.fecha) }),
+    ),
   };
 }
 
@@ -106,29 +111,36 @@ export class RepositorioVentasSupabase implements RepositorioVentas {
   }
 
   async crearPedido(p: NuevoPedido): Promise<number> {
-    const r = await supabase()
-      .from("pedido")
-      .insert({
-        cliente_id: p.clienteId,
-        presentacion_id: p.presentacionId,
-        precio_pactado: p.precioPactado,
-        anticipo: p.anticipo,
-        ciudad_entrega: p.ciudadEntrega || null,
-        notas: p.notas || null,
-        // si ya trae anticipo, nace apartado
-        estado: p.anticipo > 0 ? "apartado" : "consultado",
-      })
-      .select("id")
-      .single();
-    const id = num((revisar(r) as { id: number }).id);
-    if (p.notaInterna.trim()) await this.guardarNotaInterna(id, p.notaInterna);
-    return id;
+    // una sola transacción en la base: pedido, pago inicial, costo y nota
+    const id = revisar(
+      await supabase().rpc("crear_pedido_admin", {
+        p_cliente_id: p.clienteId,
+        p_presentacion_id: p.presentacionId,
+        p_precio_lista: p.precioLista,
+        p_descuento: p.descuento,
+        p_pago: p.anticipo,
+        p_forma: p.formaPago,
+        p_entregado: p.pagoInicial === "venta-directa",
+        p_ciudad: p.ciudadEntrega || null,
+        p_notas: p.notas || null,
+        p_nota_interna: p.notaInterna.trim() || null,
+      }),
+    );
+    return num(id);
+  }
+
+  async registrarPago(pedidoId: number, monto: number, forma: FormaPago, nota: string): Promise<void> {
+    revisar(await supabase().rpc("registrar_pago", { p_pedido_id: pedidoId, p_monto: monto, p_forma: forma, p_nota: nota || null }));
+  }
+
+  async eliminarPago(pagoId: number): Promise<void> {
+    revisar(await supabase().rpc("eliminar_pago", { p_pago_id: pagoId }));
   }
 
   async actualizarPedido(id: number, c: CambiosDePedido): Promise<void> {
     const datos: Record<string, unknown> = {};
     if (c.estado !== undefined) datos.estado = c.estado;
-    if (c.anticipo !== undefined) datos.anticipo = c.anticipo;
+    if (c.descuento !== undefined) datos.descuento = c.descuento;
     if (c.precioPactado !== undefined) datos.precio_pactado = c.precioPactado;
     if (c.ciudadEntrega !== undefined) datos.ciudad_entrega = c.ciudadEntrega;
     if (c.notas !== undefined) datos.notas = c.notas;

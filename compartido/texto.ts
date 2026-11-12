@@ -48,3 +48,20 @@ export function urlDirectaDeFoto(src: string, supabaseUrl: string): string | nul
   const m = /\/fotos\/([^/?#]+)$/.exec(src);
   return m ? `${supabaseUrl}/storage/v1/object/public/perfumes/${m[1]}` : null;
 }
+
+/**
+ * Enlace para compartir un perfume: /p/123-lattafa-asad. El número es
+ * lo que cuenta; el resto es para que se lea bonito y Google lo entienda.
+ * El Worker arma ahí la vista previa (foto, nombre, precio) que muestran
+ * WhatsApp, Instagram y Facebook al pegar el enlace.
+ */
+export function rutaDePerfume(p: { id: number; marca: string | null; nombre: string }): string {
+  return `/p/${p.id}-${slug(p.marca ?? "", p.nombre)}`;
+}
+
+/** "/p/123-lattafa-asad" → 123 (o null si no es una ruta de perfume). */
+export function idDeRutaDePerfume(ruta: string): number | null {
+  const m = /^\/p\/(\d{1,9})(?:-[a-z0-9-]*)?\/?$/.exec(ruta);
+  return m ? Number(m[1]) : null;
+}
+

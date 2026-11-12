@@ -1,7 +1,7 @@
 /** Clientes: lista con búsqueda, ficha con sus pedidos, alta manual. */
 import type { ClienteAdmin, ClienteEditable } from "../../../compartido/tipos";
 import { ErrorDeValidacion, esDeSesion, mensajeDe } from "../../negocio/errores";
-import { enlaceWhatsApp, esActivo, filtrarClientes } from "../../negocio/ventas";
+import { duplicadosPorTelefono, enlaceWhatsApp, esActivo, filtrarClientes } from "../../negocio/ventas";
 import { estado, recargarVentas, servicios } from "../estado";
 import { avisar, campo, confirmar, iconoWhatsApp, conBotonOcupado, fmtPesos, h, marcarErrores, selector, vaciar } from "../ui";
 import { chipEstado } from "./pedidos";
@@ -15,7 +15,10 @@ export function vistaClientes(): HTMLElement {
   const lista = h("div", { clase: "lista", role: "list" });
   const contador = h("p", { clase: "contador" });
 
+  let duplicados = new Map<number, string[]>();
+
   function renglon(c: ClienteAdmin): HTMLElement {
+    const choca = duplicados.get(c.id);
     const wa = enlaceWhatsApp(c.telefono, `Hola ${c.nombre.split(" ")[0]}, te escribo de Coco & Cuero.`);
     return h(
       "article",
@@ -34,6 +37,7 @@ export function vistaClientes(): HTMLElement {
         c.canal ? h("span", { clase: "etiqueta etiqueta-suave", title: c.canalDetalle ?? "" }, c.canalDetalle ? `${c.canal}: ${c.canalDetalle}` : c.canal) : null,
         c.rol === "admin" ? h("span", { clase: "etiqueta" }, "Admin") : c.conCuenta ? h("span", { clase: "etiqueta" }, "Con cuenta") : null,
         c.activo ? null : h("span", { clase: "etiqueta etiqueta-baja" }, "De baja"),
+        choca ? h("span", { clase: "etiqueta etiqueta-aviso", title: "Mismo WhatsApp: puede ser la misma persona. Revisa y da de baja el que sobre." }, `Posible duplicado de ${choca.join(", ")}`) : null,
       ),
       h(
         "dl",
@@ -52,6 +56,7 @@ export function vistaClientes(): HTMLElement {
   }
 
   function pintar() {
+    duplicados = duplicadosPorTelefono(estado.clientes);
     const base = verBajas ? estado.clientes : estado.clientes.filter((c) => c.activo);
     const visibles = filtrarClientes(base, busqueda);
     const bajas = estado.clientes.filter((c) => !c.activo).length;

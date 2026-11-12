@@ -5,7 +5,52 @@ import { esDeSesion, mensajeDe } from "../../negocio/errores";
 import { margen, semaforo, type Semaforo } from "../../negocio/precios";
 import { estado, nombreDe, recargar, servicios } from "../estado";
 import { prepararFoto } from "../foto";
-import { avisar, confirmar, fmtPesos, fmtPorcentaje, h, selector, urlDeFoto, vaciar } from "../ui";
+import { rutaDePerfume } from "../../../compartido/texto";
+import { avisar, confirmar, fmtPesos, fmtPorcentaje, h, iconoWhatsApp, selector, urlDeFoto, vaciar } from "../ui";
+
+// ------------------------------------------------------------ compartir
+/** Enlace de la tienda con vista previa (foto, nombre y precio) al pegarlo. */
+export const enlaceDeTienda = (p: Pick<Perfume, "id" | "marca" | "nombre">) => `${location.origin}${rutaDePerfume(p)}`;
+
+/** Copiar enlace y mandarlo por WhatsApp (eliges el chat en WhatsApp). */
+export function botonesCompartir(p: Perfume): HTMLElement[] {
+  const url = enlaceDeTienda(p);
+  const desde = p.presentaciones.length ? Math.min(...p.presentaciones.map((x) => x.precioVenta)) : null;
+  const texto = `${p.nombre} de ${p.marca}${desde ? ` desde ${fmtPesos(desde)}` : ""}. Míralo aquí: ${url}`;
+  const copiar = h(
+    "button",
+    {
+      type: "button",
+      clase: "boton boton-fantasma boton-chico",
+      title: url,
+      al: {
+        click: async () => {
+          try {
+            await navigator.clipboard.writeText(url);
+            avisar(`Enlace de ${p.nombre} copiado.`, "exito");
+          } catch {
+            // sin permiso de portapapeles: se muestra para copiarlo a mano
+            window.prompt("Copia el enlace:", url);
+          }
+        },
+      },
+    },
+    "Copiar enlace",
+  );
+  const wa = h(
+    "a",
+    {
+      clase: "boton-wa",
+      href: `https://wa.me/?text=${encodeURIComponent(texto)}`,
+      target: "_blank",
+      rel: "noopener",
+      title: "Mandar por WhatsApp",
+      "aria-label": `Mandar ${p.nombre} por WhatsApp`,
+    },
+    iconoWhatsApp(),
+  );
+  return [copiar, wa];
+}
 
 export const TEXTO_SEMAFORO: Record<Semaforo, string> = {
   "sin-costo": "Sin costo",
@@ -187,6 +232,8 @@ export function vistaCatalogo(alSesionVencida: () => void): HTMLElement {
           h("span", { clase: "interruptor-pista", "aria-hidden": "true" }),
           h("span", { clase: "interruptor-texto" }, p.publicado ? "En venta" : "De baja"),
         ),
+        // solo lo publicado tiene página en la tienda
+        ...(p.publicado ? botonesCompartir(p) : []),
         h("a", { clase: "boton boton-fantasma boton-chico", href: `#/perfume/${p.id}` }, "Editar"),
         // borrar solo se ofrece cuando ya está de baja: dos pasos, cero accidentes
         p.publicado

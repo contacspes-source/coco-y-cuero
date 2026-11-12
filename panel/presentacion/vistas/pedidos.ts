@@ -1,5 +1,5 @@
 /** Pedidos: lista por estado, ficha con historial y alta manual. */
-import type { EstadoPedido, NuevoPedido, PedidoAdmin } from "../../../compartido/tipos";
+import type { EstadoPedido, FormaPago, NuevoPedido, PagoInicial, PedidoAdmin } from "../../../compartido/tipos";
 import { ErrorDeValidacion, esDeSesion, mensajeDe } from "../../negocio/errores";
 import {
   ESTADOS,
@@ -14,6 +14,11 @@ import {
   transicionesDe,
   type VistaPedidos,
   gananciaDe,
+  FORMAS_PAGO,
+  descuentoBienvenida,
+  esPrimeraCompra,
+  pagoInicialDe,
+  precioFinalDe,
 } from "../../negocio/ventas";
 import { estado, recargar, recargarVentas, servicios } from "../estado";
 import { avisar, campo, iconoWhatsApp, confirmar, conBotonOcupado, fmtPesos, h, marcarErrores, selector, vaciar } from "../ui";
@@ -97,7 +102,7 @@ export function vistaPedidos(alSesionVencida: () => void): HTMLElement {
         "dl",
         { clase: "renglon-cifras" },
         h("div", null, h("dt", null, "Precio"), h("dd", { clase: "precio" }, fmtPesos(p.precioPactado))),
-        h("div", null, h("dt", null, "Anticipo"), h("dd", null, fmtPesos(p.anticipo))),
+        h("div", null, h("dt", null, "Pagado"), h("dd", null, fmtPesos(p.anticipo))),
         h("div", null, h("dt", null, "Saldo"), h("dd", { clase: p.saldo > 0 && esActivo(p.estado) ? "saldo" : undefined }, fmtPesos(p.saldo))),
       ),
       h(
@@ -198,6 +203,145 @@ export function vistaPedidos(alSesionVencida: () => void): HTMLElement {
   return vista;
 }
 
+// ------------------------------------------------------------ piezas
+/** Descuento: ninguno, 10 % de bienvenida u otra cantidad. */
+function controlDescuento(opciones: { lista: () => number; inicial: number; primeraCompra: boolean; desactivado?: boolean; alCambiar: () => void }) {
+  const { lista, inicial, primeraCompra, desactivado, alCambiar } = opciones;
+  const modoInicial = inicial <= 0 ? "ninguno" : inicial === descuentoBienvenida(lista()) ? "bienvenida" : "otro";
+  const monto = h("input", { type: "number", min: 0, step: 10, value: modoInicial === "otro" ? inicial : "", placeholder: "Pesos", disabled: desactivado, "aria-label": "Descuento en pesos" });
+  const modo = selector(
+    [
+      { valor: "ninguno", texto: "Sin descuento" },
+      { valor: "bienvenida", texto: `10 % de bienvenida${primeraCompra ? " (primera compra)" : ""}` },
+      { valor: "otro", texto: "Otra cantidad" },
+    ],
+    modoInicial,
+    () => {
+      monto.hidden = modo.value !== "otro";
+      if (modo.value === "otro") monto.focus();
+      alCambiar();
+    },
+    { disabled: desactivado },
+  );
+  monto.hidden = modoInicial !== "otro";
+  monto.addEventListener("input", alCambiar);
+  const valor = () => {
+    if (modo.value === "bienvenida") return descuentoBienvenida(lista());
+    if (modo.value === "otro") return monto.value.trim() === "" ? 0 : Number(monto.value);
+    return 0;
+  };
+  const elemento = h("div", { clase: "control-descuento" }, modo, monto);
+  return { elemento, valor };
+}
+
+function selectorForma(valor: FormaPago | "" = ""): HTMLSelectElement {
+  return selector(
+    [{ valor: "", texto: "¿Cómo te pagó?" }, ...(Object.entries(FORMAS_PAGO) as [FormaPago, string][]).map(([v, t]) => ({ valor: v, texto: t }))],
+    valor,
+    () => {},
+  );
+}
+
+/** Cobros del pedido: lista, "Pagó todo" y registrar un abono. */
+function panelPagos(p: PedidoAdmin, alCambiar: () => Promise<void>, alSesionVencida: () => void): HTMLElement {
+  const cancelado = p.estado === "cancelado";
+  const quedaSaldo = p.saldo > 0 && !cancelado;
+  const forma = selectorForma(p.pagos.at(-1)?.forma ?? "");
+  const monto = h("input", { type: "number", min: 0, step: 10, value: quedaSaldo ? p.saldo : "", disabled: !quedaSaldo });
+  const nota = h("input", { maxlength: 200, placeholder: "Opcional: referencia, quién recibió…", disabled: !quedaSaldo });
+  const registrar = h("button", { clase: "boton boton-primario", type: "submit", disabled: !quedaSaldo }, "Registrar pago");
+  const todo = h("button", { clase: "boton boton-fantasma", type: "button", disabled: !quedaSaldo }, `Pagó todo (${fmtPesos(p.saldo)})`);
+
+  const ejecutar = async (b: HTMLButtonElement, tarea: () => Promise<void>, exito: string) => {
+    marcarErrores(form, []);
+    try {
+      await conBotonOcupado(b, "Guardando…", async () => {
+        await tarea();
+        await alCambiar();
+      });
+      avisar(exito, "exito");
+    } catch (err) {
+      if (err instanceof ErrorDeValidacion) marcarErrores(form, err.problemas);
+      else avisar(mensajeDe(err), "error");
+      if (esDeSesion(err)) alSesionVencida();
+    }
+  };
+  todo.addEventListener("click", () =>
+    void ejecutar(todo, () => servicios.ventas.liquidar(p, (forma.value || null) as FormaPago | null), `Pedido #${p.id} pagado completo.`),
+  );
+
+  const lista = p.pagos.length
+    ? h(
+        "ul",
+        { clase: "pagos-lista" },
+        p.pagos.map((x) =>
+          h(
+            "li",
+            null,
+            h("span", { clase: "pago-fecha" }, fechaHora.format(new Date(x.fecha))),
+            h("span", { clase: "pago-forma" }, FORMAS_PAGO[x.forma] ?? x.forma, x.nota ? h("small", null, ` · ${x.nota}`) : null),
+            h("strong", { clase: "pago-monto" }, fmtPesos(x.monto)),
+            h(
+              "button",
+              {
+                type: "button",
+                clase: "boton-icono",
+                title: "Borrar este pago",
+                "aria-label": `Borrar pago de ${fmtPesos(x.monto)}`,
+                al: {
+                  click: async (e) => {
+                    if (!(await confirmar({ titulo: "¿Borrar este pago?", texto: `${fmtPesos(x.monto)} en ${FORMAS_PAGO[x.forma]?.toLowerCase() ?? x.forma}. El saldo del pedido vuelve a subir.`, aceptar: "Borrar", peligro: true }))) return;
+                    await ejecutar(e.currentTarget as HTMLButtonElement, () => servicios.ventas.eliminarPago(x.id), "Pago borrado.");
+                  },
+                },
+              },
+              "×",
+            ),
+          ),
+        ),
+      )
+    : h("p", { clase: "panel-ayuda" }, cancelado ? "Sin pagos." : "Todavía no hay pagos registrados.");
+
+  const form: HTMLFormElement = h(
+    "form",
+    {
+      clase: "panel panel-pagos",
+      novalidate: true,
+      al: {
+        submit: (e) => {
+          e.preventDefault();
+          void ejecutar(
+            registrar,
+            () => servicios.ventas.registrarPago(p, monto.value.trim() === "" ? Number.NaN : Number(monto.value), (forma.value || null) as FormaPago | null, nota.value),
+            "Pago registrado.",
+          );
+        },
+      },
+    },
+    h(
+      "div",
+      { clase: "pagos-cabecera" },
+      h("h2", null, "Pagos"),
+      h(
+        "dl",
+        { clase: "pagos-totales" },
+        h("div", null, h("dt", null, "Pagado"), h("dd", null, fmtPesos(p.anticipo))),
+        h("div", null, h("dt", null, "Falta"), h("dd", { clase: quedaSaldo ? "saldo" : "saldo-cero" }, quedaSaldo ? fmtPesos(p.saldo) : "Nada ✓")),
+      ),
+    ),
+    lista,
+    quedaSaldo
+      ? h(
+          "div",
+          { clase: "pagos-nuevo" },
+          h("div", { clase: "campos-3" }, campo("Monto", monto, { nombre: "monto" }), campo("Forma de pago", forma, { nombre: "forma" }), campo("Nota", nota)),
+          h("div", { clase: "panel-pie" }, todo, registrar),
+        )
+      : null,
+  );
+  return form;
+}
+
 // ------------------------------------------------------------ ficha
 export function vistaPedido(id: number, navegar: (r: string) => void, alSesionVencida: () => void): HTMLElement {
   const p = estado.pedidos.find((x) => x.id === id);
@@ -207,12 +351,20 @@ export function vistaPedido(id: number, navegar: (r: string) => void, alSesionVe
   const cerrado = !esActivo(p.estado);
   const num = (v: string) => (v.trim() === "" ? Number.NaN : Number(v));
 
-  const precio = h("input", { type: "number", min: 0, step: 10, value: p.precioPactado, disabled: cerrado });
-  const anticipo = h("input", { type: "number", min: 0, step: 10, value: p.anticipo, disabled: cerrado });
+  // precio de lista = lo que pagó el pedido + lo que se le descontó
+  const lista = h("input", { type: "number", min: 0, step: 10, value: p.precioPactado + p.descuento, disabled: cerrado });
+  const precioFinal = h("strong", null, fmtPesos(p.precioPactado));
+  const descuento = controlDescuento({
+    lista: () => num(lista.value) || 0,
+    inicial: p.descuento,
+    primeraCompra: esPrimeraCompra(p.clienteId, estado.pedidos, p.id),
+    desactivado: cerrado,
+    alCambiar: () => actualizarPrecio(),
+  });
+  const final = () => (num(lista.value) || 0) - descuento.valor();
   const ciudad = h("input", { value: p.ciudadEntrega ?? "", maxlength: 60, disabled: cerrado });
   const notas = h("textarea", { rows: 2, maxlength: 500 }, p.notas ?? "");
   const notaInterna = h("textarea", { rows: 3, maxlength: 1000, placeholder: "Solo la ves tú: proveedor, acuerdos, recordatorios…" }, p.notaInterna ?? "");
-  const saldo = h("strong", null, fmtPesos(p.saldo));
   const costo = h("input", {
     type: "number",
     min: 0,
@@ -224,14 +376,15 @@ export function vistaPedido(id: number, navegar: (r: string) => void, alSesionVe
   const ganancia = h("strong", null, fmtPesos(gananciaDe(p)));
   const actualizarGanancia = () => {
     const c = num(costo.value);
-    ganancia.textContent = Number.isFinite(c) ? fmtPesos((num(precio.value) || 0) - c) : "—";
-    ganancia.classList.toggle("negativa", Number.isFinite(c) && (num(precio.value) || 0) - c < 0);
+    ganancia.textContent = Number.isFinite(c) ? fmtPesos(final() - c) : "—";
+    ganancia.classList.toggle("negativa", Number.isFinite(c) && final() - c < 0);
+  };
+  const actualizarPrecio = () => {
+    precioFinal.textContent = fmtPesos(final());
+    actualizarGanancia();
   };
   costo.addEventListener("input", actualizarGanancia);
-  const actualizarSaldo = () => { saldo.textContent = fmtPesos((num(precio.value) || 0) - (num(anticipo.value) || 0)); };
-  precio.addEventListener("input", actualizarSaldo);
-  precio.addEventListener("input", actualizarGanancia);
-  anticipo.addEventListener("input", actualizarSaldo);
+  lista.addEventListener("input", actualizarPrecio);
 
   const botonGuardar = h("button", { clase: "boton boton-primario", type: "submit" }, "Guardar cambios");
   const form: HTMLFormElement = h(
@@ -246,8 +399,8 @@ export function vistaPedido(id: number, navegar: (r: string) => void, alSesionVe
           const cambios = cerrado
             ? { notas: notas.value.trim() || null }
             : {
-                precioPactado: num(precio.value),
-                anticipo: num(anticipo.value),
+                precioPactado: final(),
+                descuento: descuento.valor(),
                 ciudadEntrega: ciudad.value.trim() || null,
                 notas: notas.value.trim() || null,
               };
@@ -267,16 +420,13 @@ export function vistaPedido(id: number, navegar: (r: string) => void, alSesionVe
         },
       },
     },
-    h("h2", null, "Cobro y entrega"),
+    h("h2", null, "Precio y entrega"),
     h(
       "div",
       { clase: "campos-3" },
-      campo("Precio pactado", precio, { nombre: "precio" }),
-      campo("Anticipo recibido", anticipo, {
-        nombre: "anticipo",
-        ayuda: cerrado ? undefined : `Sugerido: ${fmtPesos(anticipoSugerido(p.precioPactado))}`,
-      }),
-      h("div", { clase: "campo campo-saldo" }, h("label", null, "Saldo"), saldo),
+      campo("Precio de lista", lista, { nombre: "precio" }),
+      h("div", { clase: "campo", dataset: { campo: "descuento" } }, h("label", null, "Descuento"), descuento.elemento, h("p", { clase: "campo-error", role: "alert" })),
+      h("div", { clase: "campo campo-saldo" }, h("label", null, "Precio final"), precioFinal),
     ),
     h(
       "div",
@@ -301,9 +451,6 @@ export function vistaPedido(id: number, navegar: (r: string) => void, alSesionVe
         ? h("div", { clase: "campo dato-envio" }, h("label", null, "Dirección de envío"), h("p", null, p.direccionEnvio))
         : h("div"),
     ),
-    p.descuento > 0
-      ? h("p", { clase: "dato-descuento" }, `Primera compra: se aplicó 10 % de bienvenida (${fmtPesos(p.descuento)} menos que el precio de lista).`)
-      : null,
     campo("Notas del cliente", notas, { ayuda: "El cliente las ve en su cuenta." }),
     campo("Nota interna", notaInterna, { ayuda: "Privada. El cliente nunca la ve." }),
     h("div", { clase: "panel-pie" }, botonGuardar),
@@ -394,6 +541,7 @@ export function vistaPedido(id: number, navegar: (r: string) => void, alSesionVe
             p.perfumeId ? h("a", { clase: "enlace", href: `#/perfume/${p.perfumeId}` }, "Ver perfume en el catálogo") : null,
           ),
         ),
+        panelPagos(p, recargarFicha, alSesionVencida),
         form,
       ),
       h(
@@ -420,21 +568,105 @@ export function vistaPedido(id: number, navegar: (r: string) => void, alSesionVe
 }
 
 // ------------------------------------------------------------ alta
+const OPCIONES_PAGO: { valor: PagoInicial; titulo: string; ayuda: string }[] = [
+  { valor: "nada", titulo: "Aún no paga", ayuda: "Queda como Solicitado." },
+  { valor: "anticipo", titulo: "Dejó anticipo", ayuda: "Queda Apartado; el resto se cobra al entregar." },
+  { valor: "completo", titulo: "Pagó completo", ayuda: "Queda Apartado y pagado; falta comprarlo o entregarlo." },
+  { valor: "venta-directa", titulo: "Venta en el momento", ayuda: "Se lo entregaste y te pagó: queda Entregado." },
+];
+
 export function vistaNuevoPedido(clienteInicial: number | null, navegar: (r: string) => void, alSesionVencida: () => void): HTMLElement {
-  const nuevo: NuevoPedido = { clienteId: clienteInicial, presentacionId: null, precioPactado: 0, anticipo: 0, ciudadEntrega: "", notas: "", notaInterna: "" };
+  let clienteId = clienteInicial;
+  let presentacionId: number | null = null;
+
+  const lista = h("input", { type: "number", min: 0, step: 10 });
+  const precioFinal = h("strong", null, "—");
+  const anticipo = h("input", { type: "number", min: 0, step: 10 });
+  const ayudaAnticipo = h("p", { clase: "campo-ayuda" });
+  const forma = selectorForma();
+  const ciudad = h("input", { maxlength: 60, value: estado.clientes.find((x) => x.id === clienteInicial)?.ciudad ?? "" });
+  const notas = h("textarea", { rows: 2, maxlength: 500 });
+  const notaInterna = h("textarea", { rows: 2, maxlength: 1000 });
+  const boton = h("button", { clase: "boton boton-primario", type: "submit" }, "Registrar pedido");
+  const resumenCobro = h("p", { clase: "resumen-cobro", "aria-live": "polite" });
+
+  let pagoInicial: PagoInicial = "nada";
+  const radios = OPCIONES_PAGO.map((o) =>
+    h(
+      "label",
+      { clase: "opcion-pago" },
+      h("input", {
+        type: "radio",
+        name: "pago-inicial",
+        value: o.valor,
+        checked: o.valor === "nada",
+        al: { change: () => { pagoInicial = o.valor; refrescar(); } },
+      }),
+      h("span", { clase: "opcion-pago-titulo" }, o.titulo),
+      h("span", { clase: "opcion-pago-ayuda" }, o.ayuda),
+    ),
+  );
+  const filaAnticipo = h("div", { clase: "campo", dataset: { campo: "anticipo" } }, h("label", null, "¿Cuánto dejó?"), anticipo, ayudaAnticipo, h("p", { clase: "campo-error", role: "alert" }));
+  const filaForma = campo("Forma de pago", forma, { nombre: "forma" });
+
+  // el descuento se arma cada vez que cambia el cliente (para saber si es su primera compra)
+  const cajaDescuento = h("div", { clase: "campo", dataset: { campo: "descuento" } });
+  let descuento = controlDescuento({ lista: () => Number(lista.value) || 0, inicial: 0, primeraCompra: false, alCambiar: () => refrescar() });
+  const armarDescuento = () => {
+    const primera = esPrimeraCompra(clienteId, estado.pedidos);
+    descuento = controlDescuento({
+      lista: () => Number(lista.value) || 0,
+      inicial: primera && Number(lista.value) > 0 ? descuentoBienvenida(Number(lista.value)) : 0,
+      primeraCompra: primera,
+      alCambiar: () => refrescar(),
+    });
+    vaciar(cajaDescuento, h("label", null, "Descuento"), descuento.elemento, h("p", { clase: "campo-error", role: "alert" }));
+  };
+
+  const datos = (): NuevoPedido => ({
+    clienteId,
+    presentacionId,
+    precioLista: lista.value === "" ? Number.NaN : Number(lista.value),
+    descuento: descuento.valor(),
+    pagoInicial,
+    anticipo: anticipo.value === "" ? Number.NaN : Number(anticipo.value),
+    formaPago: (forma.value || null) as FormaPago | null,
+    ciudadEntrega: ciudad.value,
+    notas: notas.value,
+    notaInterna: notaInterna.value,
+  });
+
+  function refrescar() {
+    const d = datos();
+    const final = precioFinalDe(d);
+    precioFinal.textContent = Number.isFinite(final) && final > 0 ? fmtPesos(final) : "—";
+    filaAnticipo.hidden = pagoInicial !== "anticipo";
+    filaForma.hidden = pagoInicial === "nada";
+    ayudaAnticipo.textContent = final > 0 ? `Sugerido: ${fmtPesos(anticipoSugerido(final))}` : "";
+    const cobro = Number.isFinite(final) && final > 0 ? pagoInicialDe(d) : 0;
+    resumenCobro.textContent =
+      !(final > 0) ? "" :
+      pagoInicial === "nada" ? `Total ${fmtPesos(final)}. No se registra ningún pago.` :
+      pagoInicial === "anticipo" ? (cobro > 0 ? `Se registra un pago de ${fmtPesos(cobro)}; quedan ${fmtPesos(Math.max(0, final - cobro))} por cobrar.` : "") :
+      `Se registra un pago de ${fmtPesos(final)}; no queda nada por cobrar.`;
+    boton.textContent = pagoInicial === "venta-directa" ? "Registrar venta" : "Registrar pedido";
+  }
 
   const cliente = selector(
     [
       { valor: "", texto: "Elige un cliente…" },
       ...[...estado.clientes]
+        .filter((c) => c.activo)
         .sort((a, b) => a.nombre.localeCompare(b.nombre))
         .map((c) => ({ valor: String(c.id), texto: `${c.nombre} · #${c.numeroCliente}${c.telefono ? ` · ${c.telefono}` : ""}` })),
     ],
     clienteInicial ? String(clienteInicial) : "",
     (v) => {
-      nuevo.clienteId = v ? Number(v) : null;
-      const c = estado.clientes.find((x) => x.id === nuevo.clienteId);
+      clienteId = v ? Number(v) : null;
+      const c = estado.clientes.find((x) => x.id === clienteId);
       if (c?.ciudad && !ciudad.value) ciudad.value = c.ciudad;
+      armarDescuento();
+      refrescar();
     },
   );
 
@@ -442,21 +674,15 @@ export function vistaNuevoPedido(clienteInicial: number | null, navegar: (r: str
     .filter((p) => p.publicado)
     .sort((a, b) => `${a.marca} ${a.nombre}`.localeCompare(`${b.marca} ${b.nombre}`))
     .flatMap((p) => p.presentaciones.map((pr) => ({ valor: String(pr.id), texto: `${p.marca} ${p.nombre} · ${pr.ml} ml · ${fmtPesos(pr.precioVenta)}`, precio: pr.precioVenta })));
-  const precio = h("input", { type: "number", min: 0, step: 10 });
-  const anticipo = h("input", { type: "number", min: 0, step: 10, value: 0 });
   const presentacion = selector([{ valor: "", texto: "Elige perfume y tamaño…" }, ...opcionesPerfume], "", (v) => {
-    nuevo.presentacionId = v ? Number(v) : null;
+    presentacionId = v ? Number(v) : null;
     const o = opcionesPerfume.find((x) => x.valor === v);
-    if (o) {
-      precio.value = String(o.precio);
-      ayudaAnticipo.textContent = `Sugerido: ${fmtPesos(anticipoSugerido(o.precio))}`;
-    }
+    if (o) lista.value = String(o.precio);
+    armarDescuento();
+    refrescar();
   });
-  const ayudaAnticipo = h("p", { clase: "campo-ayuda" }, "Si ya pagó anticipo, el pedido nace como Apartado.");
-  const ciudad = h("input", { maxlength: 60, value: estado.clientes.find((x) => x.id === clienteInicial)?.ciudad ?? "" });
-  const notas = h("textarea", { rows: 2, maxlength: 500 });
-  const notaInterna = h("textarea", { rows: 2, maxlength: 1000 });
-  const boton = h("button", { clase: "boton boton-primario", type: "submit" }, "Registrar pedido");
+  lista.addEventListener("input", () => { armarDescuento(); refrescar(); });
+  anticipo.addEventListener("input", refrescar);
 
   const form: HTMLFormElement = h(
     "form",
@@ -467,21 +693,13 @@ export function vistaNuevoPedido(clienteInicial: number | null, navegar: (r: str
         submit: async (e) => {
           e.preventDefault();
           marcarErrores(form, []);
-          const datos: NuevoPedido = {
-            ...nuevo,
-            precioPactado: precio.value === "" ? Number.NaN : Number(precio.value),
-            anticipo: anticipo.value === "" ? 0 : Number(anticipo.value),
-            ciudadEntrega: ciudad.value,
-            notas: notas.value,
-            notaInterna: notaInterna.value,
-          };
           try {
             const id = await conBotonOcupado(boton, "Guardando…", async () => {
-              const id = await servicios.ventas.crearPedido(datos);
+              const id = await servicios.ventas.crearPedido(datos());
               await recargarVentas();
               return id;
             });
-            avisar(`Pedido #${id} registrado.`, "exito");
+            avisar(pagoInicial === "venta-directa" ? `Venta #${id} registrada.` : `Pedido #${id} registrado.`, "exito");
             navegar(`#/pedidos/${id}`);
           } catch (err) {
             if (err instanceof ErrorDeValidacion) marcarErrores(form, err.problemas);
@@ -500,16 +718,22 @@ export function vistaNuevoPedido(clienteInicial: number | null, navegar: (r: str
       campo("Perfume y tamaño", presentacion, { nombre: "presentacion" }),
       h(
         "div",
-        { clase: "campos-2" },
-        campo("Precio pactado", precio, { nombre: "precio", ayuda: "Puedes ajustarlo si diste descuento." }),
-        h("div", { clase: "campo", dataset: { campo: "anticipo" } }, h("label", null, "Anticipo recibido"), anticipo, ayudaAnticipo, h("p", { clase: "campo-error", role: "alert" })),
+        { clase: "campos-3" },
+        campo("Precio de lista", lista, { nombre: "precio" }),
+        cajaDescuento,
+        h("div", { clase: "campo campo-saldo" }, h("label", null, "Precio final"), precioFinal),
       ),
+      h("fieldset", { clase: "opciones-pago", dataset: { campo: "pago" } }, h("legend", null, "¿Cómo va el pago?"), ...radios),
+      h("div", { clase: "campos-2" }, filaAnticipo, filaForma),
+      resumenCobro,
       campo("Ciudad de entrega", ciudad),
       campo("Notas del cliente", notas, { ayuda: "El cliente las ve en su cuenta." }),
       campo("Nota interna", notaInterna, { ayuda: "Privada." }),
     ),
     h("div", { clase: "barra-guardar" }, h("a", { clase: "boton boton-fantasma", href: "#/pedidos" }, "Cancelar"), boton),
   );
+  armarDescuento();
+  refrescar();
   if (estado.perfumes.length === 0) void recargar();
   return form;
 }

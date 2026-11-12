@@ -2,10 +2,12 @@
  * Lógica del Worker de cocoycuero.com (index.ts solo la conecta).
  *
  * Casi todo el sitio son archivos estáticos que Cloudflare sirve solo
- * (este código ni se ejecuta). Solo pasan por aquí dos rutas:
+ * (este código ni se ejecuta). Solo pasan por aquí tres rutas:
  *
  *   /api/catalogo   → la vista catalogo_publico de Supabase
  *   /fotos/<archivo> → las fotos del bucket "perfumes"
+ *   /p/<id>-<nombre> → la tienda, con la vista previa de ese perfume
+ *                      (foto, nombre y precio) para WhatsApp y redes
  *
  * ¿Por qué? Algunas redes (escuelas, oficinas, bloqueadores de anuncios
  * o filtros de DNS) bloquean *.supabase.co. Pidiendo todo a nuestro
@@ -16,6 +18,7 @@
  * nunca escribe ni usa llaves secretas.
  */
 import { BUCKET_FOTOS, SUPABASE_LLAVE_PUBLICABLE, SUPABASE_URL } from "../compartido/config";
+import { idDeRutaDePerfume } from "../compartido/texto";
 
 export interface Entorno {
   ASSETS: { fetch(peticion: Request): Promise<Response> };
@@ -59,7 +62,101 @@ export async function manejar(peticion: Request, entorno: Entorno, ctx: Contexto
     if (!NOMBRE_DE_FOTO.test(nombre)) return json({ error: "Foto no válida" }, 400);
     return foto(peticion, nombre, ctx, dep);
   }
+  if (url.pathname.startsWith("/p/")) {
+    if (!esLectura) return json({ error: "Método no permitido" }, 405, { Allow: "GET, HEAD" });
+    const id = idDeRutaDePerfume(url.pathname);
+    if (id === null) return Response.redirect(`${url.origin}/`, 302);
+    return paginaDePerfume(peticion, id, entorno, ctx, dep);
+  }
   return entorno.ASSETS.fetch(peticion);
+}
+
+// ------------------------------------------------------------ /p/<id>
+/** Lo que se mete en atributos y en <title>: nunca HTML crudo de la base. */
+export const escaparHtml = (t: string) =>
+  t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+
+const pesosMx = (n: number) => `$${Math.round(n).toLocaleString("es-MX")}`;
+
+interface FichaPublica {
+  id: number;
+  marca: string | null;
+  nombre: string;
+  tipo: string | null;
+  imagen_url: string | null;
+  presentaciones: { ml: number; precio: number | string }[] | null;
+}
+
+/** URL absoluta de la foto para la vista previa (por nuestro dominio). */
+export function fotoAbsoluta(origen: string, imagen: string | null): string | null {
+  if (!imagen) return null;
+  const m = /\/storage\/v1\/object\/public\/[^/]+\/([^/?#]+)$/.exec(imagen);
+  if (m) return `${origen}/fotos/${m[1]}`;
+  if (/^https?:\/\//.test(imagen)) return imagen;
+  return `${origen}/${imagen.replace(/^\/+/, "")}`;
+}
+
+/** Cambia título, descripción, imagen y URL de la página por los del perfume. */
+export function conVistaPrevia(html: string, f: FichaPublica, origen: string, ruta: string): string {
+  const precios = (f.presentaciones ?? []).map((x) => Number(x.precio)).filter((n) => n > 0);
+  const desde = precios.length ? Math.min(...precios) : null;
+  const titulo = [f.nombre, f.marca].filter(Boolean).join(" · ");
+  const desc = [
+    f.tipo,
+    (f.presentaciones ?? []).map((x) => `${x.ml} ml`).join(" / "),
+    desde !== null ? `desde ${pesosMx(desde)}` : null,
+    "100 % original · Coco & Cuero",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const e = escaparHtml;
+  const foto = fotoAbsoluta(origen, f.imagen_url);
+  const metas = [
+    `<meta property="og:title" content="${e(titulo)}">`,
+    `<meta property="og:description" content="${e(desc)}">`,
+    ...(foto ? [`<meta property="og:image" content="${e(foto)}">`] : []),
+    `<meta property="og:url" content="${e(origen + ruta)}">`,
+    `<meta property="og:type" content="product">`,
+    `<meta name="twitter:card" content="summary_large_image">`,
+    `<link rel="canonical" href="${e(origen + ruta)}">`,
+  ].join("\n");
+  return html
+    .replace(/<meta\s+property="og:(?:title|description|image|url|type)"[^>]*>\s*/gi, "")
+    .replace(/<meta\s+name="description"[^>]*>/i, `<meta name="description" content="${e(desc)}">`)
+    .replace(/<title>[^<]*<\/title>/i, `<title>${e(titulo)} · Coco &amp; Cuero</title>`)
+    .replace(/<\/head>/i, `${metas}\n</head>`);
+}
+
+async function paginaDePerfume(peticion: Request, id: number, entorno: Entorno, ctx: Contexto, dep: Dependencias): Promise<Response> {
+  const url = new URL(peticion.url);
+  const tienda = () => entorno.ASSETS.fetch(new Request(`${url.origin}/`, { headers: peticion.headers }));
+  const guardada = await desdeCache(peticion, dep);
+  if (guardada) return guardada;
+
+  let ficha: FichaPublica | undefined;
+  try {
+    const r = await dep.pedir(
+      `${SUPABASE_URL}/rest/v1/catalogo_publico?select=id,marca,nombre,tipo,imagen_url,presentaciones&id=eq.${id}`,
+      { headers: { apikey: SUPABASE_LLAVE_PUBLICABLE, Accept: "application/json" }, signal: AbortSignal.timeout(5000) },
+    );
+    if (r.ok) ficha = ((await r.json()) as FichaPublica[])[0];
+  } catch {
+    // sin base: se sirve la tienda normal y el sitio abre el perfume solo
+  }
+  const base = await tienda();
+  if (!ficha || !base.ok) return base;
+
+  const html = conVistaPrevia(await base.text(), ficha, url.origin, url.pathname);
+  const respuesta = new Response(html, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "public, max-age=60, s-maxage=300",
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
+  guardar(peticion, respuesta, ctx, dep);
+  return respuesta;
 }
 
 async function desdeCache(peticion: Request, dep: Dependencias) {

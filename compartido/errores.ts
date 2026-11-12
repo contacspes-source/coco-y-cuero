@@ -36,7 +36,7 @@ export function traducirError(e: unknown): ErrorDeDatos {
       return new ErrorDeDatos("credenciales", "Correo o contraseña incorrectos.");
     }
     if (/email not confirmed/i.test(msg)) {
-      return new ErrorDeDatos("credenciales", "Falta confirmar tu correo. Revisa tu bandeja de entrada.");
+      return new ErrorDeDatos("credenciales", "Falta confirmar tu correo. Busca el correo de Coco & Cuero en tu bandeja (o en spam).", "correo_sin_confirmar");
     }
     if (err.status === 429) {
       return new ErrorDeDatos("red", "Demasiados intentos. Espera un minuto y vuelve a probar.");

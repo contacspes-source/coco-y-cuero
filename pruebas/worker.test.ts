@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { CATALOGO_UPSTREAM, manejar, type Dependencias, type Entorno } from "../worker/manejador";
+import { CATALOGO_UPSTREAM, conVistaPrevia, escaparHtml, fotoAbsoluta, manejar, type Dependencias, type Entorno } from "../worker/manejador";
+import { idDeRutaDePerfume, rutaDePerfume } from "../compartido/texto";
 
 const assets: Entorno = { ASSETS: { fetch: async (r: Request) => new Response(`archivo ${new URL(r.url).pathname}`) } };
 const ctx = { esperas: [] as Promise<unknown>[], waitUntil(p: Promise<unknown>) { this.esperas.push(p); } };
@@ -101,3 +102,71 @@ describe("fotos del sitio por nuestro dominio", async () => {
   test("si /fotos/ falla, hay camino de regreso a Supabase", () =>
     expect(urlDirectaDeFoto("https://cocoycuero.com/fotos/lattafa-asad-mvpg0ib8.webp", "https://hsdthxlymeldxcoolmar.supabase.co")).toBe(supa));
 });
+
+describe("worker: /p/<id> con vista previa del perfume", () => {
+  const html = `<!doctype html><html><head><title>Coco &amp; Cuero</title>
+<meta name="description" content="general">
+<meta property="og:title" content="Coco & Cuero · Perfumería">
+<meta property="og:description" content="general">
+<meta property="og:type" content="website">
+</head><body>tienda</body></html>`;
+  const tienda: Entorno = { ASSETS: { fetch: async () => new Response(html, { headers: { "Content-Type": "text/html" } }) } };
+  const fila = {
+    id: 12,
+    marca: "Lattafa",
+    nombre: "Asad",
+    tipo: "EDP",
+    imagen_url: "https://hsdthxlymeldxcoolmar.supabase.co/storage/v1/object/public/perfumes/lattafa-asad.webp",
+    presentaciones: [{ ml: 100, precio: "870" }, { ml: 50, precio: 600 }],
+  };
+
+  test("rutas: ida y vuelta", () => {
+    expect(rutaDePerfume({ id: 12, marca: "Lattafa", nombre: "Asad Bourbon" })).toBe("/p/12-lattafa-asad-bourbon");
+    expect(idDeRutaDePerfume("/p/12-lattafa-asad-bourbon")).toBe(12);
+    expect(idDeRutaDePerfume("/p/12")).toBe(12);
+    expect(idDeRutaDePerfume("/p/abc")).toBeNull();
+    expect(idDeRutaDePerfume("/p/12/../panel")).toBeNull();
+  });
+
+  test("arma título, descripción con precio desde y la foto por nuestro dominio", async () => {
+    const urls: string[] = [];
+    const r = await manejar(pedir("/p/12-lattafa-asad"), tienda, ctx, dep(async (u) => (urls.push(u), new Response(JSON.stringify([fila])))));
+    expect(r.status).toBe(200);
+    expect(urls[0]).toContain("catalogo_publico?");
+    expect(urls[0]).toContain("id=eq.12");
+    const t = await r.text();
+    expect(t).toContain('<meta property="og:title" content="Asad · Lattafa">');
+    expect(t).toContain("desde $600");
+    expect(t).toContain('content="https://cocoycuero.com/fotos/lattafa-asad.webp"');
+    expect(t).toContain('<meta property="og:url" content="https://cocoycuero.com/p/12-lattafa-asad">');
+    expect(t).toContain("<title>Asad · Lattafa · Coco &amp; Cuero</title>");
+    // sin los og genéricos de la tienda
+    expect(t).not.toContain("Perfumería");
+    expect(t.match(/og:title/g)).toHaveLength(1);
+  });
+
+  test("un nombre con HTML no se cuela en la página", () => {
+    const t = conVistaPrevia(html, { ...fila, nombre: '"><script>alert(1)</script>' }, "https://x.com", "/p/12");
+    expect(t).not.toContain("<script>alert");
+    expect(t).toContain("&quot;&gt;&lt;script&gt;");
+    expect(escaparHtml(`<a href='x'>&`)).toBe("&lt;a href=&#39;x&#39;&gt;&amp;");
+  });
+
+  test("si el perfume no existe o la base falla, sirve la tienda normal", async () => {
+    const vacio = await manejar(pedir("/p/999"), tienda, ctx, dep(async () => new Response("[]")));
+    expect(await vacio.text()).toContain("og:type\" content=\"website");
+    const caida = await manejar(pedir("/p/999"), tienda, ctx, dep(async () => { throw new TypeError("fetch failed"); }));
+    expect(caida.status).toBe(200);
+  });
+
+  test("una ruta que no es de perfume regresa al inicio", async () => {
+    const r = await manejar(pedir("/p/abc"), tienda, ctx, dep(async () => new Response("[]")));
+    expect([301, 302]).toContain(r.status);
+  });
+
+  test("fotos relativas y sin foto", () => {
+    expect(fotoAbsoluta("https://x.com", "assets/img/a.jpg")).toBe("https://x.com/assets/img/a.jpg");
+    expect(fotoAbsoluta("https://x.com", null)).toBeNull();
+  });
+});
+

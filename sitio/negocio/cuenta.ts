@@ -240,6 +240,7 @@ type Repo = Pick<
   | "entrar"
   | "salir"
   | "recuperar"
+  | "reenviarConfirmacion"
   | "cambiarContrasena"
   | "alCambiar"
   | "canales"
@@ -298,6 +299,13 @@ export class ServicioCuenta {
       throw new ErrorDeValidacion([{ campo: "correo", mensaje: "Escribe tu correo para mandarte el enlace." }]);
     }
     return this.repo.recuperar(correo.trim().toLowerCase(), volverA, captcha);
+  }
+
+  async reenviarConfirmacion(correo: string, volverA: string, captcha: string) {
+    if (!CORREO.test(correo.trim())) {
+      throw new ErrorDeValidacion([{ campo: "correo", mensaje: "Escribe tu correo para mandarte el enlace." }]);
+    }
+    return this.repo.reenviarConfirmacion(correo.trim().toLowerCase(), volverA, captcha);
   }
 
   async cambiarContrasena(nueva: string, confirmacion: string) {

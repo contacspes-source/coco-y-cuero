@@ -9,6 +9,7 @@ import type {
   ClienteAdmin,
   ClienteEditable,
   EstadoPedido,
+  FormaPago,
   NuevoPedido,
   PedidoAdmin,
 } from "../../compartido/tipos";
@@ -48,8 +49,8 @@ export function transicionesDe(e: EstadoPedido): EstadoPedido[] {
 
 /** Lo que conviene revisar antes de avanzar (no bloquea; la persona decide). */
 export function advertenciaAlAvanzar(p: Pick<PedidoAdmin, "anticipo" | "saldo">, a: EstadoPedido): string | null {
-  if (a === "apartado" && p.anticipo <= 0) return "Este pedido no tiene anticipo registrado. Anótalo antes de marcarlo apartado.";
-  if (a === "entregado" && p.saldo > 0) return `Queda un saldo de $${p.saldo}. Al entregar, registra que ya se pagó completo.`;
+  if (a === "apartado" && p.anticipo <= 0) return "Este pedido no tiene pagos registrados. Anota el anticipo en Pagos antes de marcarlo apartado.";
+  if (a === "entregado" && p.saldo > 0) return `Queda un saldo de $${p.saldo}. Regístralo en Pagos (botón "Pagó todo") para que el pedido cierre en ceros.`;
   return null;
 }
 
@@ -62,6 +63,47 @@ export const PORCENTAJE_ANTICIPO = 0.5;
 
 export function anticipoSugerido(precio: number): number {
   return Math.min(precio, redondearADecenas(precio * PORCENTAJE_ANTICIPO));
+}
+
+// ------------------------------------------------------------------
+// Descuento de bienvenida y pagos
+// ------------------------------------------------------------------
+
+/** El mismo 10 % que aplica la página (privado.porcentaje_bienvenida). */
+export const PORCENTAJE_BIENVENIDA = 0.1;
+
+/** Pesos de descuento: el precio final se redondea a decenas, igual que en la página. */
+export function descuentoBienvenida(precioLista: number): number {
+  if (!Number.isFinite(precioLista) || precioLista <= 0) return 0;
+  return precioLista - redondearADecenas(precioLista * (1 - PORCENTAJE_BIENVENIDA));
+}
+
+/** ¿Le toca la bienvenida? Sí, si no tiene otro pedido que no esté cancelado. */
+export function esPrimeraCompra(clienteId: number | null, pedidos: PedidoAdmin[], salvo?: number): boolean {
+  if (!clienteId) return false;
+  return !pedidos.some((p) => p.clienteId === clienteId && p.id !== salvo && p.estado !== "cancelado");
+}
+
+export const FORMAS_PAGO: Record<FormaPago, string> = {
+  efectivo: "Efectivo",
+  transferencia: "Transferencia",
+  tarjeta: "Tarjeta",
+  deposito: "Depósito",
+  otro: "Otro",
+};
+
+/** Lo que falta por pagar si se aplica un precio nuevo. */
+export function saldoCon(precioFinal: number, pagado: number): number {
+  return Math.max(0, precioFinal - pagado);
+}
+
+export function validarPago(p: Pick<PedidoAdmin, "estado" | "saldo">, monto: number, forma: FormaPago | null): { campo: string; mensaje: string }[] {
+  const r: { campo: string; mensaje: string }[] = [];
+  if (p.estado === "cancelado") r.push({ campo: "monto", mensaje: "El pedido está cancelado." });
+  else if (!Number.isFinite(monto) || monto <= 0) r.push({ campo: "monto", mensaje: "Escribe cuánto te pagó." });
+  else if (monto > p.saldo) r.push({ campo: "monto", mensaje: `Es más de lo que falta por pagar (${pesos(p.saldo)}).` });
+  if (!forma) r.push({ campo: "forma", mensaje: "Elige cómo te pagó." });
+  return r;
 }
 
 const pesos = (n: number) => `$${n.toLocaleString("es-MX")}`;
@@ -99,6 +141,28 @@ export function normalizarTelefono(t: string): string | null {
   return diez.length === 10 ? diez : null;
 }
 
+/**
+ * Clientes que comparten WhatsApp con otro (p. ej. lo diste de alta tú
+ * y luego creó su cuenta en la página). No se unen solos: cualquiera
+ * podría escribir el teléfono de otra persona. Solo se avisa.
+ * Devuelve, por id de cliente, los números de cliente con los que choca.
+ */
+export function duplicadosPorTelefono(clientes: Pick<ClienteAdmin, "id" | "numeroCliente" | "telefono" | "activo">[]): Map<number, string[]> {
+  const porTel = new Map<string, Pick<ClienteAdmin, "id" | "numeroCliente">[]>();
+  for (const c of clientes) {
+    // los dados de baja no cuentan: ya se resolvió
+    const t = c.activo && c.telefono ? normalizarTelefono(c.telefono) : null;
+    if (!t) continue;
+    porTel.set(t, [...(porTel.get(t) ?? []), c]);
+  }
+  const r = new Map<number, string[]>();
+  for (const grupo of porTel.values()) {
+    if (grupo.length < 2) continue;
+    for (const c of grupo) r.set(c.id, grupo.filter((o) => o.id !== c.id).map((o) => `#${o.numeroCliente}`));
+  }
+  return r;
+}
+
 export function validarCliente(c: ClienteEditable): ProblemaDeCampo[] {
   const p: ProblemaDeCampo[] = [];
   if (c.nombre.trim().length < 2) p.push({ campo: "nombre", mensaje: "Escribe el nombre." });
@@ -107,24 +171,41 @@ export function validarCliente(c: ClienteEditable): ProblemaDeCampo[] {
   return p;
 }
 
+/** Precio final del alta (lista menos descuento). */
+export const precioFinalDe = (n: Pick<NuevoPedido, "precioLista" | "descuento">) => n.precioLista - (n.descuento || 0);
+
+/** Lo que se cobra al registrar, según la opción elegida. */
+export function pagoInicialDe(n: NuevoPedido): number {
+  const final = precioFinalDe(n);
+  if (n.pagoInicial === "completo" || n.pagoInicial === "venta-directa") return final;
+  if (n.pagoInicial === "anticipo") return n.anticipo;
+  return 0;
+}
+
 export function validarNuevoPedido(n: NuevoPedido): ProblemaDeCampo[] {
   const p: ProblemaDeCampo[] = [];
+  const final = precioFinalDe(n);
   if (!n.clienteId) p.push({ campo: "cliente", mensaje: "Elige el cliente." });
   if (!n.presentacionId) p.push({ campo: "presentacion", mensaje: "Elige el perfume y tamaño." });
-  if (!Number.isFinite(n.precioPactado) || n.precioPactado <= 0) p.push({ campo: "precio", mensaje: "El precio debe ser mayor que cero." });
-  if (!Number.isFinite(n.anticipo) || n.anticipo < 0) p.push({ campo: "anticipo", mensaje: "El anticipo no puede ser negativo." });
-  else if (n.anticipo > n.precioPactado) p.push({ campo: "anticipo", mensaje: "El anticipo no puede ser mayor que el precio." });
+  if (!Number.isFinite(n.precioLista) || n.precioLista <= 0) p.push({ campo: "precio", mensaje: "El precio debe ser mayor que cero." });
+  else if (!Number.isFinite(n.descuento) || n.descuento < 0) p.push({ campo: "descuento", mensaje: "El descuento no puede ser negativo." });
+  else if (final <= 0) p.push({ campo: "descuento", mensaje: "El descuento no puede ser igual o mayor que el precio." });
+  if (n.pagoInicial === "anticipo") {
+    if (!Number.isFinite(n.anticipo) || n.anticipo <= 0) p.push({ campo: "anticipo", mensaje: "Escribe cuánto dejó de anticipo." });
+    else if (final > 0 && n.anticipo >= final) p.push({ campo: "anticipo", mensaje: "Eso ya es el precio completo: elige \"Pagó completo\"." });
+  }
+  if (n.pagoInicial !== "nada" && !n.formaPago) p.push({ campo: "forma", mensaje: "Elige cómo te pagó." });
   return p;
 }
 
-export function validarCambios(p: Pick<PedidoAdmin, "precioPactado">, c: CambiosDePedido): ProblemaDeCampo[] {
+export function validarCambios(p: Pick<PedidoAdmin, "precioPactado" | "anticipo">, c: CambiosDePedido): ProblemaDeCampo[] {
   const r: ProblemaDeCampo[] = [];
   const precio = c.precioPactado ?? p.precioPactado;
-  if (!Number.isFinite(precio) || precio <= 0) r.push({ campo: "precio", mensaje: "El precio debe ser mayor que cero." });
-  if (c.anticipo !== undefined) {
-    if (!Number.isFinite(c.anticipo) || c.anticipo < 0) r.push({ campo: "anticipo", mensaje: "El anticipo no puede ser negativo." });
-    else if (c.anticipo > precio) r.push({ campo: "anticipo", mensaje: "El anticipo no puede ser mayor que el precio." });
+  if (c.descuento !== undefined && (!Number.isFinite(c.descuento) || c.descuento < 0)) {
+    r.push({ campo: "descuento", mensaje: "El descuento no puede ser negativo." });
   }
+  if (!Number.isFinite(precio) || precio <= 0) r.push({ campo: "precio", mensaje: "El precio final debe ser mayor que cero." });
+  else if (precio < p.anticipo) r.push({ campo: "precio", mensaje: `Ya te pagó ${pesos(p.anticipo)}; el precio no puede quedar por debajo.` });
   return r;
 }
 
@@ -207,8 +288,25 @@ export class ServicioVentas {
   async crearPedido(n: NuevoPedido): Promise<number> {
     const problemas = validarNuevoPedido(n);
     if (problemas.length) throw new ErrorDeValidacion(problemas);
-    return this.repo.crearPedido({ ...n, ciudadEntrega: n.ciudadEntrega.trim(), notas: n.notas.trim() });
+    return this.repo.crearPedido({
+      ...n,
+      anticipo: pagoInicialDe(n),
+      formaPago: n.pagoInicial === "nada" ? null : n.formaPago,
+      ciudadEntrega: n.ciudadEntrega.trim(),
+      notas: n.notas.trim(),
+    });
   }
+
+  async registrarPago(p: PedidoAdmin, monto: number, forma: FormaPago | null, nota = ""): Promise<void> {
+    const problemas = validarPago(p, monto, forma);
+    if (problemas.length) throw new ErrorDeValidacion(problemas);
+    await this.repo.registrarPago(p.id, monto, forma!, nota.trim());
+  }
+
+  /** "Pagó todo": registra lo que falta. */
+  liquidar = (p: PedidoAdmin, forma: FormaPago | null) => this.registrarPago(p, p.saldo, forma);
+
+  eliminarPago = (pagoId: number) => this.repo.eliminarPago(pagoId);
 
   async guardarCambios(p: PedidoAdmin, c: CambiosDePedido, notaInterna?: string | null): Promise<void> {
     const problemas = validarCambios(p, c);
