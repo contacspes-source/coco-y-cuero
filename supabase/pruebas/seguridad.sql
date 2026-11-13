@@ -5,7 +5,7 @@
 -- Supabase y ejecútalo. Todo corre dentro de una transacción que
 -- termina en ROLLBACK, así que NO deja datos de prueba.
 --
--- Resultado esperado: las 99 filas con estado = 'OK' (la numeración salta del 8 al 11).
+-- Resultado esperado: las 106 filas con estado = 'OK' (la numeración salta del 8 al 11).
 -- Si alguna dice 'FALLA', no publiques el cambio que hiciste.
 --
 -- Córrelas cada vez que toques una política RLS, un GRANT o una
@@ -617,6 +617,62 @@ begin
   begin perform public.registrar_pago(v, 10, 'efectivo'); r := 'REGISTRO';
   exception when insufficient_privilege then r := 'bloqueado'; end;
   reset role; insert into _p values (101,'anon registra un pago','bloqueado',r);
+end $$;
+
+-- ===== 018 · BORRAR CLIENTES PARA SIEMPRE =====
+insert into auth.users (id, email, raw_user_meta_data) values
+ ('d0d0d0d0-0000-0000-0000-000000000018','dani@prueba.mx','{"nombre":"Dani Prueba","telefono":"3399990000"}');
+
+do $$
+declare r text; dani bigint; beto bigint; jorge bigint;
+begin
+  select id into dani  from public.cliente where auth_user_id = 'd0d0d0d0-0000-0000-0000-000000000018';
+  select id into beto  from public.cliente where auth_user_id = 'bbbbbbbb-0000-0000-0000-000000000002';
+  select id into jorge from public.cliente where auth_user_id = 'cccccccc-0000-0000-0000-000000000003';
+
+  -- un cliente intenta borrar a otro
+  perform set_config('request.jwt.claims','{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}', true);
+  set local role authenticated;
+  begin perform public.borrar_cliente(dani); r := 'BORRO';
+  exception when insufficient_privilege then r := 'bloqueado'; end;
+  reset role; insert into _p values (102,'cliente borra a otro cliente','bloqueado',r);
+
+  set local role anon;
+  begin perform public.borrar_cliente(dani); r := 'BORRO';
+  exception when insufficient_privilege then r := 'bloqueado'; end;
+  reset role; insert into _p values (103,'anon borra un cliente','bloqueado',r);
+
+  -- admin
+  perform set_config('request.jwt.claims','{"sub":"cccccccc-0000-0000-0000-000000000003","role":"authenticated"}', true);
+  set local role authenticated;
+  begin perform public.borrar_cliente(dani); r := 'BORRO';
+  exception when others then r := 'rechazado'; end;
+  reset role; insert into _p values (104,'borrar cliente activo (falta la baja)','rechazado',r);
+
+  set local role authenticated;
+  begin perform public.borrar_cliente(jorge); r := 'BORRO';
+  exception when others then r := 'rechazado'; end;
+  reset role; insert into _p values (105,'borrar a un administrador','rechazado',r);
+
+  -- Beto tiene pedidos: aunque esté de baja, no se borra
+  update public.cliente set activo = false where id = beto;
+  set local role authenticated;
+  begin perform public.borrar_cliente(beto); r := 'BORRO';
+  exception when others then r := 'rechazado'; end;
+  reset role; insert into _p values (106,'borrar cliente de baja con pedidos','rechazado',r);
+
+  -- Dani de baja y sin pedidos: se borra con su cuenta y el correo queda libre
+  update public.cliente set activo = false where id = dani;
+  set local role authenticated;
+  perform public.borrar_cliente(dani);
+  reset role;
+  insert into _p select 107,'cliente y cuenta se borran','0 0',
+    (select count(*) from public.cliente where id = dani)::text || ' ' ||
+    (select count(*) from auth.users where id = 'd0d0d0d0-0000-0000-0000-000000000018')::text;
+  insert into auth.users (id, email, raw_user_meta_data) values
+   ('e0e0e0e0-0000-0000-0000-000000000018','dani@prueba.mx','{"nombre":"Dani Otra Vez","telefono":"3399990000"}');
+  insert into _p select 108,'el mismo correo se registra de nuevo','1',
+    count(*)::text from public.cliente where auth_user_id = 'e0e0e0e0-0000-0000-0000-000000000018';
 end $$;
 
 select n, prueba, esperado, obtenido,

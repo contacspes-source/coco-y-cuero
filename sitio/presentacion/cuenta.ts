@@ -18,6 +18,8 @@ import {
   pedidosActivos,
   precioConBienvenida,
   primerNombre,
+  direccionVacia,
+  formaDeEntrega,
   requiereDireccion,
   sePuedeCancelar,
   separarDireccion,
@@ -25,6 +27,7 @@ import {
   type PedidoPropio,
   type Perfil,
   type SesionActual,
+  validarRegistro,
 } from "../negocio/cuenta";
 import { cuenta, enlaceAlAbrir } from "../negocio/servicio";
 import { CIUDADES, DESCUENTO_BIENVENIDA, OTRA_CIUDAD } from "../negocio/tienda";
@@ -238,7 +241,17 @@ function selectorCiudad(valor: string | null): HTMLSelectElement {
  * Los campos de dirección completa. Solo se muestran cuando la entrega
  * es por envío a otra ciudad; en GDL, Zamora y Morelia no hacen falta.
  */
-function camposDireccion(inicial: Direccion, ciudad: HTMLSelectElement, siempre = false) {
+/**
+ * Campos de dirección en dos modos:
+ * - "opcional" (crear cuenta, Mis datos): plegados en "Agregar mi dirección";
+ *   si escribe algo, se valida completa.
+ * - "entrega" (apartar): visibles solo si es envío o a domicilio.
+ */
+function camposDireccion(
+  inicial: Direccion,
+  opciones: { modo: "opcional" } | { modo: "entrega"; visible: () => boolean; titulo: () => string },
+) {
+  const obligatorio = opciones.modo === "entrega";
   const calle = h("input", { value: inicial.calle, autocomplete: "address-line1", maxlength: 120, placeholder: "Av. Juárez 120 int. 3" });
   const colonia = h("input", { value: inicial.colonia, autocomplete: "address-level3", maxlength: 80 });
   const cp = h("input", { value: inicial.cp, autocomplete: "postal-code", inputmode: "numeric", maxlength: 5, placeholder: "00000" });
@@ -251,25 +264,13 @@ function camposDireccion(inicial: Direccion, ciudad: HTMLSelectElement, siempre 
   );
   estado.value = inicial.estado;
   const referencias = h("input", { value: inicial.referencias, maxlength: 80, placeholder: "Opcional: entre calles, color de fachada" });
-  const nodo = h(
-    "fieldset",
-    { clase: "cta-direccion" },
-    h("legend", null, siempre ? "Tu dirección" : "Dirección de envío"),
-    h(
-      "p",
-      { clase: "cta-nota" },
-      siempre
-        ? "La usamos para envíos por paquetería y para coordinar entregas. Nunca la compartimos."
-        : "Solo para envíos por paquetería a otra ciudad de la república.",
-    ),
-    campo("Calle y número", calle, { nombre: "calle", obligatorio: true }),
-    h("div", { clase: "cta-dos" }, campo("Colonia", colonia, { nombre: "colonia", obligatorio: true }), campo("Código postal", cp, { nombre: "cp", obligatorio: true })),
-    h("div", { clase: "cta-dos" }, campo("Ciudad o municipio", municipio, { nombre: "municipio", obligatorio: true }), campo("Estado", estado, { nombre: "estado", obligatorio: true })),
+  const leyenda = h("legend", null, opciones.modo === "entrega" ? opciones.titulo() : "Tu dirección");
+  const campos = [
+    campo("Calle y número", calle, { nombre: "calle", obligatorio }),
+    h("div", { clase: "cta-dos" }, campo("Colonia", colonia, { nombre: "colonia", obligatorio }), campo("Código postal", cp, { nombre: "cp", obligatorio })),
+    h("div", { clase: "cta-dos" }, campo("Ciudad o municipio", municipio, { nombre: "municipio", obligatorio }), campo("Estado", estado, { nombre: "estado", obligatorio })),
     campo("Referencias", referencias, { nombre: "referencias" }),
-  );
-  const sincronizar = () => (nodo.hidden = !siempre && !requiereDireccion(ciudad.value));
-  ciudad.addEventListener("change", sincronizar);
-  sincronizar();
+  ];
   const leer = (): Direccion => ({
     calle: calle.value,
     colonia: colonia.value,
@@ -278,7 +279,52 @@ function camposDireccion(inicial: Direccion, ciudad: HTMLSelectElement, siempre 
     estado: estado.value,
     referencias: referencias.value,
   });
-  return { nodo, leer };
+
+  if (opciones.modo === "opcional") {
+    const nodo = h(
+      "details",
+      { clase: "cta-direccion-opcional", open: !direccionVacia(inicial) },
+      h("summary", null, "Agregar mi dirección ", h("small", null, "(opcional)")),
+      h(
+        "fieldset",
+        { clase: "cta-direccion" },
+        leyenda,
+        h("p", { clase: "cta-nota" }, "Te la pedimos al apartar si eliges envío o entrega a domicilio. Si la guardas ahora, ya no tienes que escribirla. Nunca la compartimos."),
+        ...campos,
+      ),
+    );
+    return { nodo, leer, sincronizar: () => {} };
+  }
+  const { visible, titulo } = opciones;
+  const nodo = h("fieldset", { clase: "cta-direccion" }, leyenda, ...campos);
+  const sincronizar = () => {
+    nodo.hidden = !visible();
+    leyenda.textContent = titulo();
+  };
+  sincronizar();
+  return { nodo, leer, sincronizar };
+}
+
+/** WhatsApp con la lada de México fija (+52): solo se escriben los 10 dígitos. */
+function campoTelefono(valor: string | null, ayuda?: string, obligatorio = false) {
+  const input = h("input", {
+    type: "tel",
+    value: valor ?? "",
+    autocomplete: "tel-national",
+    inputmode: "numeric",
+    maxlength: 16,
+    placeholder: "33 1234 5678",
+    "aria-describedby": "lada-mx",
+  });
+  // si pegan "+52 33…" o "521…", se quita la lada al salir del campo
+  input.addEventListener("blur", () => {
+    const d = input.value.replace(/\D/g, "");
+    if (d.length === 12 && d.startsWith("52")) input.value = d.slice(2);
+    else if (d.length === 13 && d.startsWith("521")) input.value = d.slice(3);
+  });
+  const caja = h("div", { clase: "campo-lada" }, h("span", { clase: "lada", id: "lada-mx", title: "México" }, "+52"), input);
+  const nodo = campo("WhatsApp", caja, { nombre: "telefono", obligatorio, ayuda: ayuda ?? "10 dígitos: lada + número." });
+  return { nodo, input };
 }
 
 async function manejar(
@@ -310,7 +356,7 @@ const ESPERA_REENVIO_S = 60;
  * "Revisa tu correo" con la opción de reenviarlo. Supabase deja mandar
  * uno por minuto por correo, así que el botón espera 60 s entre envíos.
  */
-function pintarConfirmacion(hoja: Hoja, correo: string, continuar?: () => void, recienEnviado = true) {
+function pintarConfirmacion(hoja: Hoja, correo: string, continuar?: () => void, recienEnviado = true, corregir?: () => void) {
   const cajaCaptcha = h("div", { clase: "captcha" });
   const captcha = montarCaptcha(cajaCaptcha);
   const error = errorGeneral();
@@ -364,7 +410,7 @@ function pintarConfirmacion(hoja: Hoja, correo: string, continuar?: () => void, 
       "p",
       { clase: "cta-cambio" },
       "¿Escribiste mal tu correo? ",
-      h("button", { type: "button", clase: "enlace", al: { click: () => void abrirRegistro(continuar) } }, "Corrígelo"),
+      h("button", { type: "button", clase: "enlace", al: { click: () => (corregir ? corregir() : void abrirRegistro(continuar)) } }, "Corrígelo"),
     ),
     h(
       "a",
@@ -478,11 +524,13 @@ export async function abrirRegistro(continuar?: () => void) {
   }
 
   const nombre = h("input", { autocomplete: "name", maxlength: 80 });
-  const telefono = h("input", { type: "tel", autocomplete: "tel", inputmode: "tel", placeholder: "33 1234 5678" });
+  const tel = campoTelefono(null, "10 dígitos: lada + número. Ahí te confirmamos cada pedido.", true);
+  const telefono = tel.input;
   const correoIn = h("input", { type: "email", autocomplete: "email", inputmode: "email" });
   const clave = h("input", { type: "password", autocomplete: "new-password" });
+  const repetir = h("input", { type: "password", autocomplete: "new-password" });
   const ciudad = selectorCiudad(null);
-  const direccion = camposDireccion(separarDireccion(null), ciudad, true);
+  const direccion = camposDireccion(separarDireccion(null), { modo: "opcional" });
   const canal = h(
     "select",
     null,
@@ -510,30 +558,37 @@ export async function abrirRegistro(continuar?: () => void) {
         submit: (e) => {
           e.preventDefault();
           void manejar(form, error, boton, "Creando…", async () => {
+            const datos = {
+              nombre: nombre.value,
+              telefono: telefono.value,
+              correo: correoIn.value,
+              contrasena: clave.value,
+              confirmacion: repetir.value,
+              ciudad: ciudad.value,
+              direccion: direccion.leer(),
+              canal: canal.value,
+              canalDetalle: canalDetalle.value,
+              aceptaTerminos: acepta.checked,
+            };
+            // los errores de los campos se ven antes de gastar la verificación
+            const problemas = validarRegistro(datos);
+            if (problemas.length) throw new ErrorDeValidacion(problemas);
             const token = await captcha.token();
             let r: { requiereConfirmacion: boolean };
             try {
-              r = await cuenta.registrar(
-                {
-                  nombre: nombre.value,
-                  telefono: telefono.value,
-                  correo: correoIn.value,
-                  contrasena: clave.value,
-                  ciudad: ciudad.value,
-                  direccion: direccion.leer(),
-                  canal: canal.value,
-                  canalDetalle: canalDetalle.value,
-                  aceptaTerminos: acepta.checked,
-                },
-                volverAqui(),
-                token,
-              );
+              r = await cuenta.registrar(datos, volverAqui(), token);
             } catch (e) {
               captcha.reiniciar();
               throw e;
             }
             if (r.requiereConfirmacion) {
-              pintarConfirmacion(hoja, correoIn.value.trim().toLowerCase(), continuar);
+              // "Corrígelo" regresa a este mismo formulario, con todo lo que ya escribió
+              pintarConfirmacion(hoja, correoIn.value.trim().toLowerCase(), continuar, true, () => {
+                pintarFormulario();
+                captcha.reiniciar();
+                correoIn.focus();
+                correoIn.select();
+              });
             } else {
               await refrescarSesion();
               avisar("¡Bienvenido a Coco & Cuero!", "exito");
@@ -566,9 +621,10 @@ export async function abrirRegistro(continuar?: () => void) {
     },
     h("p", { clase: "cta-nota cta-obligatorios" }, "Los campos con * son obligatorios."),
     campo("Nombre completo", nombre, { nombre: "nombre", obligatorio: true }),
-    campo("WhatsApp", telefono, { nombre: "telefono", obligatorio: true, ayuda: "Ahí te confirmamos cada pedido." }),
+    tel.nodo,
     campo("Correo", correoIn, { nombre: "correo", obligatorio: true }),
     campo("Contraseña", clave, { nombre: "contrasena", obligatorio: true, ayuda: `Al menos ${LARGO_MINIMO_CONTRASENA} caracteres, con letras y números.` }),
+    campo("Repite la contraseña", repetir, { nombre: "confirmacion", obligatorio: true }),
     h("div", { clase: "cta-dos" }, campo("Ciudad", ciudad, { nombre: "ciudad", obligatorio: true }), campo("¿Cómo nos conociste?", canal, { nombre: "canal", obligatorio: true })),
     cajaDetalle,
     direccion.nodo,
@@ -594,11 +650,13 @@ export async function abrirRegistro(continuar?: () => void) {
     boton,
     h("p", { clase: "cta-nota" }, "Usamos tus datos solo para tus pedidos. Nunca los compartimos."),
   );
-  hoja.pintar(
-    ...encabezado("Crear cuenta", `Recibes tu número de cliente, apartas en línea y te llevas ${PORCENTAJE} de descuento en tu primera compra.`),
-    form,
-    h("p", { clase: "cta-cambio" }, "¿Ya tienes cuenta? ", h("button", { type: "button", clase: "enlace", al: { click: () => abrirEntrar(continuar) } }, "Entra")),
-  );
+  const pintarFormulario = () =>
+    hoja.pintar(
+      ...encabezado("Crear cuenta", `Recibes tu número de cliente, apartas en línea y te llevas ${PORCENTAJE} de descuento en tu primera compra.`),
+      form,
+      h("p", { clase: "cta-cambio" }, "¿Ya tienes cuenta? ", h("button", { type: "button", clase: "enlace", al: { click: () => abrirEntrar(continuar) } }, "Entra")),
+    );
+  pintarFormulario();
   queueMicrotask(() => nombre.focus());
 }
 
@@ -724,9 +782,10 @@ function tarjetaPedido(p: PedidoPropio, alCambiar: () => void): HTMLElement {
 
 function formularioDatos(perfil: Perfil, canales: { id: number; nombre: string }[], alGuardar: () => void): HTMLElement {
   const nombre = h("input", { value: perfil.nombre, autocomplete: "name" });
-  const telefono = h("input", { type: "tel", value: perfil.telefono ?? "", autocomplete: "tel" });
+  const tel = campoTelefono(perfil.telefono);
+  const telefono = tel.input;
   const ciudad = selectorCiudad(perfil.ciudad);
-  const direccion = camposDireccion(separarDireccion(perfil.direccion), ciudad, true);
+  const direccion = camposDireccion(separarDireccion(perfil.direccion), { modo: "opcional" });
   const canal = h(
     "select",
     null,
@@ -761,7 +820,7 @@ function formularioDatos(perfil: Perfil, canales: { id: number; nombre: string }
       },
     },
     campo("Nombre completo", nombre, { nombre: "nombre" }),
-    campo("WhatsApp", telefono, { nombre: "telefono" }),
+    tel.nodo,
     h("div", { clase: "cta-dos" }, campo("Ciudad", ciudad, { nombre: "ciudad" }), campo("¿Cómo nos conociste?", canal)),
     direccion.nodo,
     h("p", { clase: "cta-nota" }, `Correo de la cuenta: ${perfil.correo}`),
@@ -881,7 +940,27 @@ export async function abrirApartar(p: PerfumePublico, pr: PerfumePublico["presen
   }
   const foto = urlDeFoto(p.imagenUrl);
   const ciudad = selectorCiudad(perfil?.ciudad ?? null);
-  const direccion = camposDireccion(separarDireccion(perfil?.direccion ?? null), ciudad);
+  // En las tres ciudades: punto acordado o a domicilio. Fuera: paquetería.
+  const aDomicilio = h("input", { type: "radio", name: "entrega", value: "domicilio" });
+  const enPunto = h("input", { type: "radio", name: "entrega", value: "punto", checked: true });
+  const entrega = h(
+    "fieldset",
+    { clase: "cta-entrega", dataset: { campo: "entrega" } },
+    h("legend", null, "¿Cómo te lo entregamos?"),
+    h("label", { clase: "cta-opcion" }, enPunto, h("span", null, h("strong", null, "En un punto acordado"), h("small", null, "Quedamos por WhatsApp en un lugar céntrico."))),
+    h("label", { clase: "cta-opcion" }, aDomicilio, h("span", null, h("strong", null, "A domicilio"), h("small", null, "Te lo llevamos a tu casa u oficina."))),
+  );
+  const direccion = camposDireccion(separarDireccion(perfil?.direccion ?? null), {
+    modo: "entrega",
+    visible: () => requiereDireccion(ciudad.value, aDomicilio.checked),
+    titulo: () => (formaDeEntrega(ciudad.value, aDomicilio.checked) === "envio" ? "Dirección de envío (paquetería)" : "Dirección de entrega"),
+  });
+  const sincronizarEntrega = () => {
+    entrega.hidden = !ciudad.value || formaDeEntrega(ciudad.value, false) === "envio";
+    direccion.sincronizar();
+  };
+  for (const x of [ciudad, aDomicilio, enPunto]) x.addEventListener("change", sincronizarEntrega);
+  sincronizarEntrega();
   const conDescuento = descuento > 0;
   const precioFinal = conDescuento ? precioConBienvenida(pr.precio, descuento) : pr.precio;
   const notas = h("textarea", { rows: 3, maxlength: 500, placeholder: "Opcional: es para regalo, horario para entregar, etc." });
@@ -896,7 +975,7 @@ export async function abrirApartar(p: PerfumePublico, pr: PerfumePublico["presen
         submit: (e) => {
           e.preventDefault();
           void manejar(form, error, boton, "Enviando…", async () => {
-            const id = await cuenta.apartar(pr.id, ciudad.value || null, notas.value, direccion.leer());
+            const id = await cuenta.apartar(pr.id, ciudad.value || null, notas.value, direccion.leer(), aDomicilio.checked);
             if (conDescuento) {
               descuento = 0;
               actualizarBoton();
@@ -916,6 +995,7 @@ export async function abrirApartar(p: PerfumePublico, pr: PerfumePublico["presen
       },
     },
     campo("Ciudad de entrega", ciudad, { nombre: "ciudad" }),
+    entrega,
     direccion.nodo,
     campo("Notas para nosotros", notas, { nombre: "notas" }),
     error,

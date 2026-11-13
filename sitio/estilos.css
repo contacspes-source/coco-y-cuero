@@ -325,6 +325,39 @@ main.catalogo{padding-top:44px;padding-bottom:84px}
 .cta-direccion{display:flex;flex-direction:column;gap:12px;margin:0;padding:14px 14px 16px;border:1px solid var(--linea);border-radius:14px;background:var(--papel)}
 .cta-direccion[hidden]{display:none}
 .cta-direccion legend{padding:0 6px;font-family:var(--display);font-size:17px}
+/* dirección opcional al crear la cuenta: plegada */
+.cta-direccion-opcional{border:1px dashed var(--linea);border-radius:14px;background:transparent}
+.cta-direccion-opcional>summary{
+  display:flex;align-items:center;gap:8px;padding:13px 16px;cursor:pointer;list-style:none;
+  font-family:var(--display);font-size:17px;color:var(--ebano);
+}
+.cta-direccion-opcional>summary::-webkit-details-marker{display:none}
+.cta-direccion-opcional>summary::before{content:"+";display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--arena);font-family:var(--util);font-size:15px;line-height:1}
+.cta-direccion-opcional[open]>summary::before{content:"−"}
+.cta-direccion-opcional>summary small{font-family:var(--util);font-size:12.5px;color:var(--tinta-suave)}
+.cta-direccion-opcional[open]{border-style:solid}
+.cta-direccion-opcional .cta-direccion{border:0;border-top:1px solid var(--linea);border-radius:0 0 14px 14px}
+.cta-direccion-opcional .cta-direccion legend{display:none}
+
+/* WhatsApp con +52 fijo */
+.campo-lada{display:flex;align-items:stretch}
+.campo-lada .lada{
+  display:grid;place-items:center;padding:0 12px;border:1px solid var(--linea);border-right:0;border-radius:12px 0 0 12px;
+  background:var(--arena);font-size:15px;color:var(--tinta);font-variant-numeric:tabular-nums;
+}
+.campo .campo-lada input{border-radius:0 12px 12px 0;min-width:0}
+.con-error .campo-lada .lada{border-color:#a2462b}
+
+/* al apartar: punto acordado o a domicilio */
+.cta-entrega{display:flex;flex-direction:column;gap:8px;margin:0;padding:0;border:0;min-width:0}
+.cta-entrega[hidden]{display:none}
+.cta-entrega legend{padding:0;margin-bottom:6px;font-size:12.5px;letter-spacing:.06em;color:var(--tinta-suave)}
+.cta-opcion{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border:1px solid var(--linea);border-radius:12px;background:var(--papel);cursor:pointer}
+.cta-opcion:has(input:checked){border-color:var(--cuero);box-shadow:0 0 0 3px rgba(122,78,50,.1)}
+.cta-opcion input{width:18px;height:18px;margin:2px 0 0;flex:none;accent-color:var(--cuero)}
+.cta-opcion span{display:flex;flex-direction:column;gap:2px}
+.cta-opcion strong{font-weight:500;font-size:14.5px}
+.cta-opcion small{font-size:12.5px;color:var(--tinta-suave)}
 .cta-form .cta-acepto label{display:flex;gap:10px;align-items:flex-start;margin:0;font-size:13.5px;letter-spacing:0;text-transform:none;line-height:1.5;color:var(--tinta);cursor:pointer}
 .cta-form .cta-acepto input{width:18px;height:18px;min-height:0;margin:1px 0 0;padding:0;flex:none;accent-color:var(--cuero)}
 .cta-acepto a{color:var(--cuero)}
@@ -404,9 +437,10 @@ html.con-hoja{overflow:hidden}
   background:var(--arena);color:#5d4635;font-size:13.5px;line-height:1.6;
 }
 .det-encabezado{display:flex;align-items:center;justify-content:space-between;gap:12px}
-.det-encabezado .ficha-marca{margin:0}
+.det-encabezado .ficha-marca{margin:0;min-width:0}
+.det-enlaces{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .det-compartir{
-  display:inline-flex;align-items:center;gap:7px;flex:none;max-width:60%;
+  display:inline-flex;align-items:center;gap:7px;flex:none;max-width:100%;
   padding:7px 14px;border-radius:999px;border:1px solid var(--linea);background:var(--papel);cursor:pointer;
   font:inherit;font-size:13.5px;color:var(--cuero);transition:border-color .18s ease,background .18s ease;
 }

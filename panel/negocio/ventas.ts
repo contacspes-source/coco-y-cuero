@@ -135,10 +135,12 @@ export function enlaceWhatsApp(telefono: string | null, texto: string): string |
 // Validación
 // ------------------------------------------------------------------
 
+/** Igual que en la página: 10 dígitos de México, con o sin +52 / +521. */
 export function normalizarTelefono(t: string): string | null {
-  const d = t.replace(/\D/g, "");
-  const diez = d.length > 10 ? d.slice(-10) : d;
-  return diez.length === 10 ? diez : null;
+  let d = t.replace(/\D/g, "");
+  if (d.length === 13 && d.startsWith("521")) d = d.slice(3);
+  else if (d.length === 12 && d.startsWith("52")) d = d.slice(2);
+  return /^[2-9]\d{9}$/.test(d) ? d : null;
 }
 
 /**
@@ -166,7 +168,7 @@ export function duplicadosPorTelefono(clientes: Pick<ClienteAdmin, "id" | "numer
 export function validarCliente(c: ClienteEditable): ProblemaDeCampo[] {
   const p: ProblemaDeCampo[] = [];
   if (c.nombre.trim().length < 2) p.push({ campo: "nombre", mensaje: "Escribe el nombre." });
-  if (c.telefono.trim() && !normalizarTelefono(c.telefono)) p.push({ campo: "telefono", mensaje: "El teléfono debe tener 10 dígitos." });
+  if (c.telefono.trim() && !normalizarTelefono(c.telefono)) p.push({ campo: "telefono", mensaje: "WhatsApp de 10 dígitos (lada + número), sin el +52." });
   if (c.direccion.length > 200) p.push({ campo: "direccion", mensaje: "Dirección demasiado larga." });
   return p;
 }
@@ -270,6 +272,7 @@ export class ServicioVentas {
   listarClientes = () => this.repo.listarClientes();
   darDeBajaCliente = (id: number) => this.repo.darDeBajaCliente(id);
   reactivarCliente = (id: number) => this.repo.reactivarCliente(id);
+  borrarCliente = (id: number) => this.repo.borrarCliente(id);
   listarPedidos = () => this.repo.listarPedidos();
   canales = () => this.repo.canales();
 

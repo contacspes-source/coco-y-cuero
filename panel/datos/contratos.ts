@@ -58,6 +58,8 @@ export interface RepositorioVentas {
   /** Baja lógica: la base cancela sus solicitudes y lo marca inactivo. */
   darDeBajaCliente(clienteId: number): Promise<void>;
   reactivarCliente(clienteId: number): Promise<void>;
+  /** Para siempre, con su cuenta de acceso. Solo dados de baja y sin pedidos. */
+  borrarCliente(clienteId: number): Promise<void>;
   listarPedidos(): Promise<PedidoAdmin[]>;
   /** `anticipo` ya trae lo que se cobra al registrar (0, anticipo o el total). */
   crearPedido(p: NuevoPedido): Promise<number>;

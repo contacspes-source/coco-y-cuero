@@ -99,37 +99,51 @@ export function vistaDetalle(p: PerfumePublico, todos: PerfumePublico[], acc: Ac
     );
   }
 
-  // compartir: en el celular abre el menú del sistema (WhatsApp, Instagram…);
-  // en la computadora copia el enlace con vista previa (/p/<id>-<nombre>)
-  const textoCompartir = h("span", null, "Compartir");
+  // Dos botones: "Copiar enlace" (siempre) y "Compartir", que abre el menú
+  // del celular (WhatsApp, Instagram…) y solo aparece donde existe.
+  const textoCopiar = h("span", null, "Copiar enlace");
   const copiar = h(
     "button",
     {
       type: "button",
       clase: "det-compartir",
-      "aria-label": `Compartir ${p.marca} ${p.nombre}`,
+      title: acc.enlace(p),
       al: {
         click: async () => {
           const url = acc.enlace(p);
           try {
-            if (navigator.share) {
-              await navigator.share({ title: `${p.nombre} · ${p.marca}`, text: `Mira este perfume en Coco & Cuero:`, url });
-              return;
-            }
             await navigator.clipboard.writeText(url);
-            textoCompartir.textContent = "Enlace copiado ✓";
-          } catch (e) {
-            // canceló el menú: nada que hacer. Si no hubo portapapeles, se muestra el enlace.
-            if (e instanceof DOMException && e.name === "AbortError") return;
-            textoCompartir.textContent = url;
+            textoCopiar.textContent = "¡Copiado!";
+          } catch {
+            // sin permiso de portapapeles: se muestra para copiarlo a mano
+            textoCopiar.textContent = url.replace(/^https?:\/\//, "");
           }
-          setTimeout(() => (textoCompartir.textContent = "Compartir"), 2600);
+          setTimeout(() => (textoCopiar.textContent = "Copiar enlace"), 2600);
         },
       },
     },
-    iconoCompartir(),
-    textoCompartir,
+    icono(["M9 15l6-6", "M10.5 6.5l1.8-1.8a4 4 0 0 1 5.7 5.7l-1.8 1.8", "M13.5 17.5l-1.8 1.8a4 4 0 0 1-5.7-5.7l1.8-1.8"]),
+    textoCopiar,
   );
+  const compartir =
+    typeof navigator.share === "function"
+      ? h(
+          "button",
+          {
+            type: "button",
+            clase: "det-compartir",
+            "aria-label": `Compartir ${p.nombre}`,
+            al: {
+              click: () =>
+                void navigator.share({ title: `${p.nombre} · ${p.marca}`, text: "Mira este perfume en Coco & Cuero:", url: acc.enlace(p) }).catch(() => {
+                  /* canceló el menú */
+                }),
+            },
+          },
+          icono(["M12 3v12", "M7 8l5-5 5 5", "M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"]),
+          h("span", null, "Compartir"),
+        )
+      : null;
 
   const grupos = notasPorFamilia(p);
   const parecidos = similares(p, todos);
@@ -146,7 +160,7 @@ export function vistaDetalle(p: PerfumePublico, todos: PerfumePublico[], acc: Ac
     h(
       "div",
       { clase: "det-info" },
-      h("div", { clase: "det-encabezado" }, h("p", { clase: "ficha-marca" }, p.marca), copiar),
+      h("div", { clase: "det-encabezado" }, h("p", { clase: "ficha-marca" }, p.marca), h("div", { clase: "det-enlaces" }, copiar, compartir)),
       h("h2", { clase: "det-nombre" }, p.nombre),
       h("p", { clase: "det-ficha" }, [TIPO_LARGO[p.tipo] ?? p.tipo, genero, categoria?.nombre].filter(Boolean).join(" · ")),
       precio,
@@ -216,16 +230,15 @@ export function vistaDetalle(p: PerfumePublico, todos: PerfumePublico[], acc: Ac
   return vista;
 }
 
-function iconoCompartir(): SVGSVGElement {
+function icono(trazos: string[]): SVGSVGElement {
   const ns = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(ns, "svg");
   svg.setAttribute("viewBox", "0 0 24 24");
   svg.setAttribute("aria-hidden", "true");
-  for (const d of ["M12 3v12", "M7 8l5-5 5 5", "M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"]) {
+  for (const d of trazos) {
     const path = document.createElementNS(ns, "path");
     path.setAttribute("d", d);
     svg.append(path);
   }
   return svg;
 }
-

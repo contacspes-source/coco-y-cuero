@@ -103,6 +103,10 @@ export class RepositorioVentasSupabase implements RepositorioVentas {
     revisar(await supabase().rpc("reactivar_cliente", { p_cliente_id: clienteId }));
   }
 
+  async borrarCliente(clienteId: number): Promise<void> {
+    revisar(await supabase().rpc("borrar_cliente", { p_cliente_id: clienteId }));
+  }
+
   async listarPedidos(): Promise<PedidoAdmin[]> {
     const filas = revisar(
       await supabase().from("pedido_detalle").select("*").order("creado_en", { ascending: false }),

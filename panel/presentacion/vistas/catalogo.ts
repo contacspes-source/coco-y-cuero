@@ -5,12 +5,22 @@ import { esDeSesion, mensajeDe } from "../../negocio/errores";
 import { margen, semaforo, type Semaforo } from "../../negocio/precios";
 import { estado, nombreDe, recargar, servicios } from "../estado";
 import { prepararFoto } from "../foto";
-import { rutaDePerfume } from "../../../compartido/texto";
+import { nombresDeEnlace, rutaDePerfume } from "../../../compartido/texto";
 import { avisar, confirmar, fmtPesos, fmtPorcentaje, h, iconoWhatsApp, selector, urlDeFoto, vaciar } from "../ui";
 
 // ------------------------------------------------------------ compartir
-/** Enlace de la tienda con vista previa (foto, nombre y precio) al pegarlo. */
-export const enlaceDeTienda = (p: Pick<Perfume, "id" | "marca" | "nombre">) => `${location.origin}${rutaDePerfume(p)}`;
+/**
+ * Enlace de la tienda con el nombre del perfume (/p/lattafa-asad) y vista
+ * previa al pegarlo. Se calcula sobre lo PUBLICADO, igual que la tienda,
+ * para que los dos den la misma dirección.
+ */
+let nombresCache: { de: Perfume[]; nombres: Map<number, string> } | null = null;
+export function enlaceDeTienda(p: Pick<Perfume, "id">): string {
+  if (nombresCache?.de !== estado.perfumes) {
+    nombresCache = { de: estado.perfumes, nombres: nombresDeEnlace(estado.perfumes.filter((x) => x.publicado)) };
+  }
+  return `${location.origin}${rutaDePerfume(nombresCache.nombres.get(p.id) ?? String(p.id))}`;
+}
 
 /** Copiar enlace y mandarlo por WhatsApp (eliges el chat en WhatsApp). */
 export function botonesCompartir(p: Perfume): HTMLElement[] {

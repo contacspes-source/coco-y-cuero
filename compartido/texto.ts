@@ -49,19 +49,59 @@ export function urlDirectaDeFoto(src: string, supabaseUrl: string): string | nul
   return m ? `${supabaseUrl}/storage/v1/object/public/perfumes/${m[1]}` : null;
 }
 
+// ------------------------------------------------------------------
+// Enlaces por nombre: /p/lattafa-asad
+// ------------------------------------------------------------------
+
+export interface PerfumeConNombre {
+  id: number;
+  marca: string | null;
+  nombre: string;
+  tipo?: string | null;
+}
+
 /**
- * Enlace para compartir un perfume: /p/123-lattafa-asad. El número es
- * lo que cuenta; el resto es para que se lea bonito y Google lo entienda.
- * El Worker arma ahí la vista previa (foto, nombre, precio) que muestran
- * WhatsApp, Instagram y Facebook al pegar el enlace.
+ * El nombre de cada perfume en su enlace: "lattafa-asad". Si dos se
+ * llaman igual (el mismo en EDT y EDP), se agrega el tipo; si aun así
+ * chocan, el número. Se calcula sobre la lista PUBLICADA y en el mismo
+ * orden (por id) en la tienda, el panel y el Worker, así los tres dan
+ * el mismo enlace.
  */
-export function rutaDePerfume(p: { id: number; marca: string | null; nombre: string }): string {
-  return `/p/${p.id}-${slug(p.marca ?? "", p.nombre)}`;
+export function nombresDeEnlace(perfumes: PerfumeConNombre[]): Map<number, string> {
+  const orden = [...perfumes].sort((a, b) => a.id - b.id);
+  const base = new Map(orden.map((p) => [p.id, slug(p.marca ?? "", p.nombre)]));
+  const cuantos = (m: Map<number, string>) => {
+    const c = new Map<string, number>();
+    for (const v of m.values()) c.set(v, (c.get(v) ?? 0) + 1);
+    return c;
+  };
+  const c1 = cuantos(base);
+  const conTipo = new Map(orden.map((p) => {
+    const b = base.get(p.id)!;
+    return [p.id, c1.get(b)! > 1 && p.tipo ? `${b}-${slug(p.tipo)}` : b];
+  }));
+  const c2 = cuantos(conTipo);
+  return new Map(orden.map((p) => {
+    const b = conTipo.get(p.id)!;
+    return [p.id, c2.get(b)! > 1 ? `${b}-${p.id}` : b];
+  }));
 }
 
-/** "/p/123-lattafa-asad" → 123 (o null si no es una ruta de perfume). */
-export function idDeRutaDePerfume(ruta: string): number | null {
-  const m = /^\/p\/(\d{1,9})(?:-[a-z0-9-]*)?\/?$/.exec(ruta);
-  return m ? Number(m[1]) : null;
+export const rutaDePerfume = (nombreEnlace: string) => `/p/${nombreEnlace}`;
+
+/**
+ * Qué perfume pide la ruta. Acepta el enlace por nombre (/p/lattafa-asad)
+ * y los que ya se compartieron antes: /p/12-lattafa-asad y /p/12.
+ */
+export function perfumeDeRuta(ruta: string, nombres: Map<number, string>): number | null {
+  const m = /^\/p\/([a-z0-9-]{1,120})\/?$/.exec(ruta);
+  if (!m) return null;
+  const texto = m[1]!;
+  for (const [id, n] of nombres) if (n === texto) return id;
+  const viejo = /^(\d{1,9})(?:-|$)/.exec(texto);
+  if (viejo && nombres.has(Number(viejo[1]))) return Number(viejo[1]);
+  return null;
 }
 
+/** ¿Es una ruta de perfume bien formada? (antes de saber si existe) */
+export const esRutaDePerfume = (ruta: string) => /^\/p\/[a-z0-9-]{1,120}\/?$/.test(ruta);

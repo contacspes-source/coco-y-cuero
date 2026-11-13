@@ -200,6 +200,28 @@ export function vistaCliente(idTexto: string, navegar: (r: string) => void, alSe
     }
   }
 
+  // borrar para siempre: solo dados de baja y sin pedidos (lo revisa la base)
+  async function borrar() {
+    if (!c) return;
+    const ok = await confirmar({
+      titulo: `¿Borrar a ${c.nombre} para siempre?`,
+      texto: `Se borra el cliente #${c.numeroCliente} y su cuenta de acceso${c.correo ? ` (${c.correo})` : ""}. Ese correo podrá registrarse de nuevo. No se puede deshacer.`,
+      aceptar: "Borrar para siempre",
+      peligro: true,
+    });
+    if (!ok) return;
+    try {
+      await servicios.ventas.borrarCliente(c.id);
+      await recargarVentas();
+      avisar(`${c.nombre} se borró.`, "exito");
+      navegar("#/clientes");
+    } catch (e) {
+      avisar(mensajeDe(e), "error");
+      if (esDeSesion(e)) alSesionVencida();
+    }
+  }
+  const sePuedeBorrar = Boolean(c && !c.activo && c.rol !== "admin" && pedidos.length === 0);
+
   return h(
     "section",
     { clase: "vista" },
@@ -229,6 +251,7 @@ export function vistaCliente(idTexto: string, navegar: (r: string) => void, alSe
             c.rol === "admin"
               ? null
               : h("button", { type: "button", clase: c.activo ? "boton boton-peligro" : "boton boton-fantasma", al: { click: () => void cambiarActivo() } }, c.activo ? "Dar de baja" : "Reactivar"),
+            sePuedeBorrar ? h("button", { type: "button", clase: "boton boton-peligro", al: { click: () => void borrar() } }, "Borrar para siempre") : null,
             c.activo ? h("a", { clase: "boton boton-primario", href: `#/pedidos/nuevo?cliente=${c.id}` }, "+ Pedido para este cliente") : null,
           )
         : null,

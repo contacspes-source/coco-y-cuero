@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { CATALOGO_UPSTREAM, conVistaPrevia, escaparHtml, fotoAbsoluta, manejar, type Dependencias, type Entorno } from "../worker/manejador";
-import { idDeRutaDePerfume, rutaDePerfume } from "../compartido/texto";
+import { nombresDeEnlace, perfumeDeRuta, rutaDePerfume } from "../compartido/texto";
 
 const assets: Entorno = { ASSETS: { fetch: async (r: Request) => new Response(`archivo ${new URL(r.url).pathname}`) } };
 const ctx = { esperas: [] as Promise<unknown>[], waitUntil(p: Promise<unknown>) { this.esperas.push(p); } };
@@ -120,25 +120,43 @@ describe("worker: /p/<id> con vista previa del perfume", () => {
     presentaciones: [{ ml: 100, precio: "870" }, { ml: 50, precio: 600 }],
   };
 
-  test("rutas: ida y vuelta", () => {
-    expect(rutaDePerfume({ id: 12, marca: "Lattafa", nombre: "Asad Bourbon" })).toBe("/p/12-lattafa-asad-bourbon");
-    expect(idDeRutaDePerfume("/p/12-lattafa-asad-bourbon")).toBe(12);
-    expect(idDeRutaDePerfume("/p/12")).toBe(12);
-    expect(idDeRutaDePerfume("/p/abc")).toBeNull();
-    expect(idDeRutaDePerfume("/p/12/../panel")).toBeNull();
+  test("el enlace lleva el nombre; los repetidos se distinguen por tipo", () => {
+    const n = nombresDeEnlace([
+      { id: 30, marca: "Carolina Herrera", nombre: "Bad Boy", tipo: "EDP" },
+      { id: 12, marca: "Lattafa", nombre: "Asad", tipo: "EDP" },
+      { id: 31, marca: "Carolina Herrera", nombre: "Bad Boy", tipo: "EDT" },
+      { id: 40, marca: "Afnan", nombre: "9pm", tipo: "EDP" },
+      { id: 41, marca: "Afnan", nombre: "9pm", tipo: "EDP" },
+    ]);
+    expect(n.get(12)).toBe("lattafa-asad");
+    expect(n.get(30)).toBe("carolina-herrera-bad-boy-edp");
+    expect(n.get(31)).toBe("carolina-herrera-bad-boy-edt");
+    // mismo nombre y mismo tipo: el número los separa
+    expect(n.get(40)).toBe("afnan-9pm-edp-40");
+    expect(n.get(41)).toBe("afnan-9pm-edp-41");
+    expect(rutaDePerfume(n.get(12)!)).toBe("/p/lattafa-asad");
+  });
+
+  test("de la ruta al perfume, incluidos los enlaces viejos", () => {
+    const n = new Map([[12, "lattafa-asad"], [7, "afnan-9pm"]]);
+    expect(perfumeDeRuta("/p/lattafa-asad", n)).toBe(12);
+    expect(perfumeDeRuta("/p/12-lattafa-asad", n)).toBe(12);
+    expect(perfumeDeRuta("/p/12", n)).toBe(12);
+    expect(perfumeDeRuta("/p/no-existe", n)).toBeNull();
+    expect(perfumeDeRuta("/p/999", n)).toBeNull();
+    expect(perfumeDeRuta("/p/../panel", n)).toBeNull();
   });
 
   test("arma título, descripción con precio desde y la foto por nuestro dominio", async () => {
     const urls: string[] = [];
-    const r = await manejar(pedir("/p/12-lattafa-asad"), tienda, ctx, dep(async (u) => (urls.push(u), new Response(JSON.stringify([fila])))));
+    const r = await manejar(pedir("/p/lattafa-asad"), tienda, ctx, dep(async (u) => (urls.push(u), new Response(JSON.stringify([fila])))));
     expect(r.status).toBe(200);
     expect(urls[0]).toContain("catalogo_publico?");
-    expect(urls[0]).toContain("id=eq.12");
     const t = await r.text();
     expect(t).toContain('<meta property="og:title" content="Asad · Lattafa">');
     expect(t).toContain("desde $600");
     expect(t).toContain('content="https://cocoycuero.com/fotos/lattafa-asad.webp"');
-    expect(t).toContain('<meta property="og:url" content="https://cocoycuero.com/p/12-lattafa-asad">');
+    expect(t).toContain('<meta property="og:url" content="https://cocoycuero.com/p/lattafa-asad">');
     expect(t).toContain("<title>Asad · Lattafa · Coco &amp; Cuero</title>");
     // sin los og genéricos de la tienda
     expect(t).not.toContain("Perfumería");
@@ -152,6 +170,11 @@ describe("worker: /p/<id> con vista previa del perfume", () => {
     expect(escaparHtml(`<a href='x'>&`)).toBe("&lt;a href=&#39;x&#39;&gt;&amp;");
   });
 
+  test("un enlace viejo (/p/12-…) da la vista previa con la dirección nueva", async () => {
+    const r = await manejar(pedir("/p/12-lattafa-asad"), tienda, ctx, dep(async () => new Response(JSON.stringify([fila]))));
+    expect(await r.text()).toContain('<link rel="canonical" href="https://cocoycuero.com/p/lattafa-asad">');
+  });
+
   test("si el perfume no existe o la base falla, sirve la tienda normal", async () => {
     const vacio = await manejar(pedir("/p/999"), tienda, ctx, dep(async () => new Response("[]")));
     expect(await vacio.text()).toContain("og:type\" content=\"website");
@@ -160,7 +183,7 @@ describe("worker: /p/<id> con vista previa del perfume", () => {
   });
 
   test("una ruta que no es de perfume regresa al inicio", async () => {
-    const r = await manejar(pedir("/p/abc"), tienda, ctx, dep(async () => new Response("[]")));
+    const r = await manejar(pedir("/p/Hola_Mundo!"), tienda, ctx, dep(async () => new Response("[]")));
     expect([301, 302]).toContain(r.status);
   });
 

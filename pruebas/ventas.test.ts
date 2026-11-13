@@ -205,6 +205,7 @@ describe("ServicioVentas", () => {
     bajas: number[] = [];
     async darDeBajaCliente(id: number) { this.bajas.push(id); }
     async reactivarCliente(id: number) { this.bajas = this.bajas.filter((x) => x !== id); }
+    async borrarCliente(id: number) { this.bajas = this.bajas.filter((x) => x !== id); }
     async listarPedidos() { return []; }
     async crearPedido(p: NuevoPedido) { this.creados.push(p); return 1; }
     pagos: [number, number, string, string][] = [];

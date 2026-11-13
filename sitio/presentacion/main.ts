@@ -5,7 +5,7 @@
 import "../estilos.css";
 import { h, vaciar } from "../../compartido/dom";
 import { SUPABASE_URL } from "../../compartido/config";
-import { idDeRutaDePerfume, rutaDePerfume, sinAcentos, urlDeFoto, urlDirectaDeFoto, usarFotosPorNuestroDominio } from "../../compartido/texto";
+import { nombresDeEnlace, perfumeDeRuta, rutaDePerfume, sinAcentos, urlDeFoto, urlDirectaDeFoto, usarFotosPorNuestroDominio } from "../../compartido/texto";
 import type { PerfumePublico } from "../../compartido/tipos";
 import {
   CATEGORIAS,
@@ -86,13 +86,8 @@ const barraFijaChips = $("barra-fija-chips");
 const SEMILLA = semillaDelDia(new Date());
 
 let perfumes: PerfumePublico[] = [];
-// Enlace para compartir (/p/123-lattafa-asad): el Worker ya puso la vista
-// previa para WhatsApp y redes; aquí se pasa a la forma de siempre
-// (?perfume=123) para que la tienda abra ese perfume.
-{
-  const id = idDeRutaDePerfume(location.pathname);
-  if (id !== null) history.replaceState(null, "", `/?perfume=${id}${location.hash}`);
-}
+/** id → nombre en el enlace ("lattafa-asad"); se arma al llegar el catálogo. */
+let nombresEnlace = new Map<number, string>();
 
 let filtros: Filtros = leerFiltros(location.search);
 
@@ -100,24 +95,35 @@ const pesos = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN
 const nombreGenero = (clave: string) => GENEROS.find((g) => g.clave === clave)?.nombre ?? "";
 
 // ------------------------------------------------------------ detalle
-const enlaceDe = (p: PerfumePublico) => `${location.pathname}${conPerfume(location.search, p.id)}`;
-const enlaceCompleto = (p: PerfumePublico) => `${location.origin}${rutaDePerfume(p)}`;
+// Cada perfume tiene su dirección con el nombre: /p/lattafa-asad. Se ve en
+// la barra del navegador al abrirlo, así que se puede copiar de ahí o con
+// el botón "Copiar enlace". Los filtros que tenga puestos se conservan.
+const nombreEnlaceDe = (p: PerfumePublico) => nombresEnlace.get(p.id) ?? String(p.id);
+const enlaceDe = (p: PerfumePublico) => `${rutaDePerfume(nombreEnlaceDe(p))}${conPerfume(location.search, null)}`;
+const enlaceCompleto = (p: PerfumePublico) => `${location.origin}${rutaDePerfume(nombreEnlaceDe(p))}`;
+const tiendaSinPerfume = () => `/${conPerfume(location.search, null)}${location.hash}`;
+
+/** El perfume que pide la dirección: /p/<nombre> o el viejo ?perfume=12. */
+function perfumeEnLaDireccion(): PerfumePublico | undefined {
+  const id = perfumeDeRuta(location.pathname, nombresEnlace) ?? leerPerfumeAbierto(location.search);
+  return id === null ? undefined : perfumes.find((x) => x.id === id);
+}
 
 function abrirDetalle(p: PerfumePublico, empujar = true) {
-  if (empujar && leerPerfumeAbierto(location.search) !== p.id) {
-    history.pushState({ perfume: p.id }, "", enlaceDe(p));
-  }
+  const ruta = enlaceDe(p);
+  if (empujar && `${location.pathname}${location.search}` !== ruta) history.pushState({ perfume: p.id }, "", ruta);
+  else if (!empujar && location.pathname !== rutaDePerfume(nombreEnlaceDe(p))) history.replaceState({ perfume: p.id }, "", ruta);
   const hoja = abrirHoja({
     etiqueta: `${p.marca} ${p.nombre}`,
     clase: "hoja-detalle",
     alCerrar: () => {
-      if (leerPerfumeAbierto(location.search) !== null) {
-        history.replaceState(null, "", `${location.pathname}${conPerfume(location.search, null)}`);
+      if (location.pathname.startsWith("/p/") || leerPerfumeAbierto(location.search) !== null) {
+        history.replaceState(null, "", tiendaSinPerfume());
       }
       document.title = TITULO;
     },
   });
-  document.title = `${p.marca} ${p.nombre} · Coco & Cuero`;
+  document.title = `${p.nombre} · ${p.marca} · Coco & Cuero`;
   hoja.pintar(
     vistaDetalle(p, perfumes, {
       apartar: (perfume, presentacion) => void abrirApartar(perfume, presentacion, () => abrirDetalle(perfume, false)),
@@ -133,8 +139,7 @@ const TITULO = document.title;
 
 // atrás/adelante del navegador abre o cierra el detalle
 window.addEventListener("popstate", () => {
-  const id = leerPerfumeAbierto(location.search);
-  const p = id === null ? undefined : perfumes.find((x) => x.id === id);
+  const p = perfumeEnLaDireccion();
   if (p) abrirDetalle(p, false);
   else if (hojaAbierta()) cerrarHoja();
 });
@@ -825,15 +830,18 @@ conteo.textContent = "· cargando…";
 cargarCatalogo()
   .then(({ perfumes: lista, origen }) => {
     perfumes = lista;
+    nombresEnlace = nombresDeEnlace(perfumes);
     cargado = true;
     // una marca que ya no está en el catálogo (enlace viejo) se ignora
     if (filtros.marca && !marcasDe(perfumes).some((m) => m.clave === filtros.marca)) filtros = { ...filtros, marca: null };
     pintarVitrina();
     portada.conPerfumes(perfumes);
     pintar();
-    const abierto = leerPerfumeAbierto(location.search);
-    const p = abierto === null ? undefined : perfumes.find((x) => x.id === abierto);
+    // abre el perfume del enlace; un enlace viejo (?perfume=12 o /p/12-…) se
+    // cambia en la barra por el de nombre
+    const p = perfumeEnLaDireccion();
     if (p) abrirDetalle(p, false);
+    else if (location.pathname.startsWith("/p/")) history.replaceState(null, "", tiendaSinPerfume());
     if (origen === "respaldo") {
       rejilla.before(
         h("p", { clase: "aviso-respaldo" }, "Mostramos el catálogo guardado mientras se restablece la conexión. Confirma precio y disponibilidad por WhatsApp."),

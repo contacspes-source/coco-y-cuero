@@ -25,12 +25,20 @@ import { problemaDeContrasena } from "../../compartido/contrasena";
 export const LARGO_MAXIMO_NOMBRE = 120;
 export const LARGO_MAXIMO_NOTAS = 500;
 
-/** "+52 (33) 1234-5678" → "3312345678"; null si no son 10 dígitos. */
+/**
+ * WhatsApp de México: 10 dígitos (lada + número). Acepta que lo escriban
+ * con +52 (o el viejo +521 de celulares), espacios, guiones o paréntesis.
+ * "+52 (33) 1234-5678" → "3312345678". Cualquier otra cosa → null: ni 9
+ * dígitos, ni 11, ni un número que empiece en 0 o 1 (no existen en México).
+ */
 export function normalizarTelefono(texto: string): string | null {
-  const digitos = texto.replace(/\D/g, "");
-  const diez = digitos.length > 10 ? digitos.slice(-10) : digitos;
-  return diez.length === 10 ? diez : null;
+  let d = texto.replace(/\D/g, "");
+  if (d.length === 13 && d.startsWith("521")) d = d.slice(3);
+  else if (d.length === 12 && d.startsWith("52")) d = d.slice(2);
+  return /^[2-9]\d{9}$/.test(d) ? d : null;
 }
+
+export const MENSAJE_TELEFONO = "Escribe tu WhatsApp a 10 dígitos (lada + número).";
 
 const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
@@ -62,8 +70,22 @@ export const ESTADOS_DE_MEXICO = [
 export const LARGO_MAXIMO_DIRECCION = 300;
 const SEPARADOR = " · ";
 
-/** Al APARTAR, la dirección solo hace falta para envío a otra ciudad. */
-export const requiereDireccion = (ciudad: string | null) => ciudad === OTRA_CIUDAD;
+/**
+ * Cómo se entrega: en Guadalajara, Zamora y Morelia en un punto acordado
+ * o a domicilio; a otra ciudad, por paquetería.
+ */
+export type FormaDeEntrega = "punto" | "domicilio" | "envio";
+
+export const formaDeEntrega = (ciudad: string | null, aDomicilio: boolean): FormaDeEntrega =>
+  ciudad === OTRA_CIUDAD ? "envio" : aDomicilio ? "domicilio" : "punto";
+
+/** Al APARTAR, la dirección hace falta para envío o entrega a domicilio. */
+export const requiereDireccion = (ciudad: string | null, aDomicilio = false) =>
+  formaDeEntrega(ciudad, aDomicilio) !== "punto";
+
+/** ¿Dejó la dirección en blanco? (al registrarse es opcional) */
+export const direccionVacia = (d: Direccion) =>
+  [d.calle, d.colonia, d.cp, d.municipio, d.estado, d.referencias].every((x) => !x.trim());
 
 /** Canal "Otro": el cliente debe decir cuál. */
 export const CANAL_OTRO = "Otro";
@@ -122,6 +144,8 @@ export function separarDireccion(texto: string | null): Direccion {
 /** Lo que llena el cliente; la dirección se compone antes de enviarse. */
 export type FormularioRegistro = Omit<DatosDeRegistro, "direccion"> & {
   direccion: Direccion;
+  /** la contraseña otra vez, para descartar un error de dedo */
+  confirmacion: string;
   aceptaTerminos: boolean;
 };
 
@@ -136,19 +160,21 @@ function validarCanal(canal: string, detalle: string): ProblemaDeCampo[] {
 }
 
 /**
- * Todo es obligatorio al crear la cuenta, dirección incluida (sirve para
- * cualquier envío futuro y para tener el padrón completo).
+ * Al crear la cuenta la dirección es OPCIONAL: se pide al apartar, solo
+ * si es envío o entrega a domicilio. Si la escribe, debe ir completa
+ * (una dirección a medias no sirve para mandar nada).
  */
 export function validarRegistro(d: FormularioRegistro): ProblemaDeCampo[] {
   const p: ProblemaDeCampo[] = [];
   if (d.nombre.trim().length < 3) p.push({ campo: "nombre", mensaje: "Escribe tu nombre completo." });
   else if (d.nombre.trim().length > LARGO_MAXIMO_NOMBRE) p.push({ campo: "nombre", mensaje: "El nombre es demasiado largo." });
-  if (!normalizarTelefono(d.telefono)) p.push({ campo: "telefono", mensaje: "Tu WhatsApp a 10 dígitos." });
+  if (!normalizarTelefono(d.telefono)) p.push({ campo: "telefono", mensaje: MENSAJE_TELEFONO });
   if (!CORREO.test(d.correo.trim()) || d.correo.trim().length > 254) p.push({ campo: "correo", mensaje: "Revisa tu correo." });
   const clave = problemaDeContrasena(d.contrasena);
   if (clave) p.push({ campo: "contrasena", mensaje: clave });
+  else if (d.confirmacion !== d.contrasena) p.push({ campo: "confirmacion", mensaje: "Las contraseñas no coinciden." });
   if (!d.ciudad) p.push({ campo: "ciudad", mensaje: "Elige tu ciudad." });
-  p.push(...validarDireccion(d.direccion));
+  if (!direccionVacia(d.direccion)) p.push(...validarDireccion(d.direccion));
   p.push(...validarCanal(d.canal, d.canalDetalle));
   if (!d.aceptaTerminos) p.push({ campo: "terminos", mensaje: "Acepta los términos para crear tu cuenta." });
   return p;
@@ -166,8 +192,8 @@ export function validarPerfil(p: Pick<FormularioPerfil, "nombre" | "telefono"> &
   const r: ProblemaDeCampo[] = [];
   if (p.nombre.trim().length < 3) r.push({ campo: "nombre", mensaje: "Escribe tu nombre completo." });
   else if (p.nombre.trim().length > LARGO_MAXIMO_NOMBRE) r.push({ campo: "nombre", mensaje: "El nombre es demasiado largo." });
-  if (!normalizarTelefono(p.telefono)) r.push({ campo: "telefono", mensaje: "Tu WhatsApp a 10 dígitos." });
-  if (p.direccion) r.push(...validarDireccion(p.direccion));
+  if (!normalizarTelefono(p.telefono)) r.push({ campo: "telefono", mensaje: MENSAJE_TELEFONO });
+  if (p.direccion && !direccionVacia(p.direccion)) r.push(...validarDireccion(p.direccion));
   return r;
 }
 
@@ -280,7 +306,7 @@ export class ServicioCuenta {
         ciudad: d.ciudad,
         canal: d.canal,
         canalDetalle: requiereDetalleDeCanal(d.canal) ? d.canalDetalle.trim().replace(/\s+/g, " ") : "",
-        direccion: componerDireccion(d.direccion),
+        direccion: direccionVacia(d.direccion) ? "" : componerDireccion(d.direccion),
       },
       volverA,
       captcha,
@@ -322,7 +348,7 @@ export class ServicioCuenta {
     await this.repo.guardarPerfil({
       nombre,
       telefono: normalizarTelefono(p.telefono),
-      direccion: componerDireccion(p.direccion),
+      direccion: direccionVacia(p.direccion) ? null : componerDireccion(p.direccion),
       ciudad: p.ciudad || null,
       canalId: p.canalId,
     });
@@ -330,13 +356,13 @@ export class ServicioCuenta {
     return nombre;
   }
 
-  /** Envío a otra ciudad exige dirección completa; en las tres ciudades no se pide. */
-  async apartar(presentacionId: number | null, ciudad: string | null, notas: string, direccion: Direccion | null = null) {
+  /** Envío o entrega a domicilio exigen dirección completa; en un punto acordado no se pide. */
+  async apartar(presentacionId: number | null, ciudad: string | null, notas: string, direccion: Direccion | null = null, aDomicilio = false) {
     if (presentacionId === null) {
       throw new ErrorDeDatos("regla", "Este perfume no se puede apartar en línea. Pídelo por WhatsApp.");
     }
     let envio: string | null = null;
-    if (requiereDireccion(ciudad)) {
+    if (requiereDireccion(ciudad, aDomicilio)) {
       const problemas = validarDireccion(direccion ?? DIRECCION_VACIA);
       if (problemas.length) throw new ErrorDeValidacion(problemas);
       envio = componerDireccion(direccion!);

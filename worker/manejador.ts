@@ -6,8 +6,9 @@
  *
  *   /api/catalogo   → la vista catalogo_publico de Supabase
  *   /fotos/<archivo> → las fotos del bucket "perfumes"
- *   /p/<id>-<nombre> → la tienda, con la vista previa de ese perfume
- *                      (foto, nombre y precio) para WhatsApp y redes
+ *   /p/<nombre>     → la tienda, con la vista previa de ese perfume
+ *                      (foto, nombre y precio) para WhatsApp y redes.
+ *                      También acepta los enlaces viejos /p/<id>-…
  *
  * ¿Por qué? Algunas redes (escuelas, oficinas, bloqueadores de anuncios
  * o filtros de DNS) bloquean *.supabase.co. Pidiendo todo a nuestro
@@ -18,7 +19,7 @@
  * nunca escribe ni usa llaves secretas.
  */
 import { BUCKET_FOTOS, SUPABASE_LLAVE_PUBLICABLE, SUPABASE_URL } from "../compartido/config";
-import { idDeRutaDePerfume } from "../compartido/texto";
+import { esRutaDePerfume, nombresDeEnlace, perfumeDeRuta, rutaDePerfume } from "../compartido/texto";
 
 export interface Entorno {
   ASSETS: { fetch(peticion: Request): Promise<Response> };
@@ -64,9 +65,8 @@ export async function manejar(peticion: Request, entorno: Entorno, ctx: Contexto
   }
   if (url.pathname.startsWith("/p/")) {
     if (!esLectura) return json({ error: "Método no permitido" }, 405, { Allow: "GET, HEAD" });
-    const id = idDeRutaDePerfume(url.pathname);
-    if (id === null) return Response.redirect(`${url.origin}/`, 302);
-    return paginaDePerfume(peticion, id, entorno, ctx, dep);
+    if (!esRutaDePerfume(url.pathname)) return Response.redirect(`${url.origin}/`, 302);
+    return paginaDePerfume(peticion, entorno, ctx, dep);
   }
   return entorno.ASSETS.fetch(peticion);
 }
@@ -127,26 +127,35 @@ export function conVistaPrevia(html: string, f: FichaPublica, origen: string, ru
     .replace(/<\/head>/i, `${metas}\n</head>`);
 }
 
-async function paginaDePerfume(peticion: Request, id: number, entorno: Entorno, ctx: Contexto, dep: Dependencias): Promise<Response> {
+async function paginaDePerfume(peticion: Request, entorno: Entorno, ctx: Contexto, dep: Dependencias): Promise<Response> {
   const url = new URL(peticion.url);
   const tienda = () => entorno.ASSETS.fetch(new Request(`${url.origin}/`, { headers: peticion.headers }));
   const guardada = await desdeCache(peticion, dep);
   if (guardada) return guardada;
 
+  // Para saber qué perfume es "lattafa-asad" hace falta la lista publicada
+  // (los nombres repetidos se distinguen con el tipo, igual que en la tienda).
   let ficha: FichaPublica | undefined;
+  let ruta = url.pathname;
   try {
     const r = await dep.pedir(
-      `${SUPABASE_URL}/rest/v1/catalogo_publico?select=id,marca,nombre,tipo,imagen_url,presentaciones&id=eq.${id}`,
+      `${SUPABASE_URL}/rest/v1/catalogo_publico?select=id,marca,nombre,tipo,imagen_url,presentaciones&order=id`,
       { headers: { apikey: SUPABASE_LLAVE_PUBLICABLE, Accept: "application/json" }, signal: AbortSignal.timeout(5000) },
     );
-    if (r.ok) ficha = ((await r.json()) as FichaPublica[])[0];
+    if (r.ok) {
+      const lista = (await r.json()) as FichaPublica[];
+      const nombres = nombresDeEnlace(lista);
+      const id = perfumeDeRuta(url.pathname, nombres);
+      ficha = lista.find((x) => x.id === id);
+      if (ficha) ruta = rutaDePerfume(nombres.get(ficha.id)!);
+    }
   } catch {
     // sin base: se sirve la tienda normal y el sitio abre el perfume solo
   }
   const base = await tienda();
   if (!ficha || !base.ok) return base;
 
-  const html = conVistaPrevia(await base.text(), ficha, url.origin, url.pathname);
+  const html = conVistaPrevia(await base.text(), ficha, url.origin, ruta);
   const respuesta = new Response(html, {
     status: 200,
     headers: {
