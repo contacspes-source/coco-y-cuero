@@ -651,7 +651,7 @@ form.panel .campos-3 { margin-top: 0; }
 
 /* widget de Turnstile (CAPTCHA) en el login; vacío cuando está apagado */
 .captcha:empty{display:none}
-.captcha{min-height:65px;display:flex;justify-content:center}
+.captcha{display:flex;justify-content:center}
 
 /* clientes dados de baja */
 .etiqueta-baja { background: var(--bajo); color: #fff; }

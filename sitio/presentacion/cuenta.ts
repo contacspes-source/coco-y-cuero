@@ -2,7 +2,7 @@
  * Pantallas de la cuenta del cliente dentro de la hoja lateral:
  * entrar, crear cuenta, recuperar contraseña, Mi cuenta y Apartar.
  */
-import { montarCaptcha } from "../../compartido/captcha";
+import { montarCaptcha, type Captcha } from "../../compartido/captcha";
 import { avisar, campo, conBotonOcupado, h, marcarErrores, vaciar } from "../../compartido/dom";
 import { urlDeFoto } from "../../compartido/texto";
 import type { PerfumePublico } from "../../compartido/tipos";
@@ -357,8 +357,9 @@ const ESPERA_REENVIO_S = 60;
  * uno por minuto por correo, así que el botón espera 60 s entre envíos.
  */
 function pintarConfirmacion(hoja: Hoja, correo: string, continuar?: () => void, recienEnviado = true, corregir?: () => void) {
+  // la verificación se carga solo si toca "Reenviar correo"
   const cajaCaptcha = h("div", { clase: "captcha" });
-  const captcha = montarCaptcha(cajaCaptcha);
+  let captcha: Captcha | null = null;
   const error = errorGeneral();
   const reenviar = h("button", { clase: "boton boton-oscuro boton-ancho", type: "button" }, "Reenviar correo");
   let reloj: number | undefined;
@@ -383,6 +384,7 @@ function pintarConfirmacion(hoja: Hoja, correo: string, continuar?: () => void, 
     vaciar(error);
     try {
       await conBotonOcupado(reenviar, "Enviando…", async () => {
+        captcha ??= montarCaptcha(cajaCaptcha);
         const token = await captcha.token();
         try {
           await cuenta.reenviarConfirmacion(correo, volverAqui(), token);
@@ -410,7 +412,21 @@ function pintarConfirmacion(hoja: Hoja, correo: string, continuar?: () => void, 
       "p",
       { clase: "cta-cambio" },
       "¿Escribiste mal tu correo? ",
-      h("button", { type: "button", clase: "enlace", al: { click: () => (corregir ? corregir() : void abrirRegistro(continuar)) } }, "Corrígelo"),
+      h(
+        "button",
+        {
+          type: "button",
+          clase: "enlace",
+          al: {
+            click: () => {
+              captcha?.quitar();
+              if (corregir) corregir();
+              else void abrirRegistro(continuar);
+            },
+          },
+        },
+        "Corrígelo",
+      ),
     ),
     h(
       "a",
@@ -559,8 +575,18 @@ export async function abrirRegistro(continuar?: () => void) {
   escribioAlgo = () => [nombre, telefono, correoIn, clave, repetir].some((x) => x.value.trim() !== "");
   const error = errorGeneral();
   const boton = h("button", { clase: "boton boton-oscuro boton-ancho", type: "submit" }, "Crear mi cuenta");
+  // el recuadro de verificación vive en un iframe: si sale de la página y
+  // vuelve (al tocar "Corrígelo"), se rompe y ya no entrega su token. Por
+  // eso, al regresar al formulario, se monta uno nuevo.
   const cajaCaptcha = h("div", { clase: "captcha" });
-  const captcha = montarCaptcha(cajaCaptcha);
+  let captcha = montarCaptcha(cajaCaptcha);
+  const captchaNuevo = () => {
+    captcha.quitar();
+    const nueva = h("div", { clase: "captcha" });
+    cajaCaptcha.replaceChildren();
+    cajaCaptcha.append(nueva);
+    captcha = montarCaptcha(nueva);
+  };
 
   const form: HTMLFormElement = h(
     "form",
@@ -601,7 +627,7 @@ export async function abrirRegistro(continuar?: () => void) {
               pintarConfirmacion(hoja, correoIn.value.trim().toLowerCase(), continuar, true, () => {
                 guardaDeCierre(noSalirSinQuerer);
                 pintarFormulario();
-                captcha.reiniciar();
+                captchaNuevo();
                 correoIn.focus();
                 correoIn.select();
               });

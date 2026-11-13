@@ -21,7 +21,7 @@ import { TURNSTILE_SITE_KEY } from "./config";
 
 const SCRIPT = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
 /** Cuánto se espera a que la persona resuelva el reto antes de rendirse. */
-const ESPERA_MAXIMA_MS = 120_000;
+const ESPERA_MAXIMA_MS = 45_000;
 
 interface Turnstile {
   render(
@@ -124,6 +124,9 @@ export function montarCaptcha(contenedor: HTMLElement): Captcha {
         sitekey: TURNSTILE_SITE_KEY,
         language: "es",
         theme: "light",
+        // el recuadro solo aparece si Cloudflare necesita que la persona
+        // marque la casilla; a la mayoría la verifica en silencio
+        appearance: "interaction-only",
         callback: entregar,
         "expired-callback": () => {
           tokenListo = null;
@@ -162,7 +165,7 @@ export function montarCaptcha(contenedor: HTMLElement): Captcha {
       return new Promise<string>((resolver, rechazar) => {
         const reloj = setTimeout(() => {
           esperando = esperando.filter((e) => e.resolver !== resolver);
-          rechazar(new ErrorDeCaptcha("La verificación tardó demasiado. Recarga la página e inténtalo de nuevo."));
+          rechazar(new ErrorDeCaptcha("Falta la verificación de seguridad: marca la casilla de arriba del botón y vuelve a intentarlo."));
         }, ESPERA_MAXIMA_MS);
         esperando.push({
           resolver: (t) => (clearTimeout(reloj), resolver(t)),
