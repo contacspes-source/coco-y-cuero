@@ -383,6 +383,18 @@ html.con-hoja{overflow:hidden}
 .hoja-cerrar:hover{border-color:var(--caramelo)}
 .hoja-cuerpo{padding:30px 72px 48px 38px;outline:none}
 .hoja-angosta .hoja-cuerpo{padding-top:44px}
+/* crear cuenta: pantalla completa, con el formulario centrado */
+.hoja.hoja-completa{inset:0;width:100vw;height:100dvh;box-shadow:none}
+.hoja.hoja-completa[open]{animation:subir-hoja .3s cubic-bezier(.2,.8,.2,1)}
+.hoja-completa .hoja-cuerpo{max-width:540px;margin:0 auto;padding:22px 24px 56px}
+.hoja-completa .hoja-cerrar{display:none}
+.cta-barra-completa{
+  position:sticky;top:0;z-index:4;display:flex;align-items:center;justify-content:space-between;gap:12px;
+  margin:-22px -24px 18px;padding:14px 24px;background:rgba(248,241,232,.94);backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--linea);
+}
+.cta-barra-completa .cta-volver{margin:0;font-size:15px}
+.cta-marca{font-family:var(--display);font-size:19px;letter-spacing:.04em;color:var(--ebano)}
 
 /* ------------------------------------------------ detalle */
 .detalle{display:grid;grid-template-columns:minmax(0,.95fr) minmax(0,1.05fr);gap:38px;align-items:start}
@@ -579,6 +591,9 @@ a:focus-visible, button:focus-visible, input:focus-visible{
   .hoja[open]{animation:subir-hoja .3s cubic-bezier(.2,.8,.2,1)}
   .hoja-cuerpo,.hoja-angosta .hoja-cuerpo{padding:64px 20px 40px}
   .hoja-cerrar{top:calc(6dvh + 10px);right:12px}
+  .hoja.hoja-completa{inset:0;width:100vw;height:100dvh;border-radius:0;box-shadow:none}
+  .hoja-completa .hoja-cuerpo{padding:22px 20px 48px}
+  .cta-barra-completa{margin:-22px -20px 16px;padding:12px 20px}
   .detalle{grid-template-columns:1fr;gap:20px}
   .det-foto{position:relative;top:auto;aspect-ratio:1;margin-top:0}
   .det-precio{font-size:30px}

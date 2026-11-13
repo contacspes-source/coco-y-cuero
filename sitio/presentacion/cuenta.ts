@@ -32,7 +32,7 @@ import {
 import { cuenta, enlaceAlAbrir } from "../negocio/servicio";
 import { CIUDADES, DESCUENTO_BIENVENIDA, OTRA_CIUDAD } from "../negocio/tienda";
 import { linkWhatsApp } from "./config";
-import { abrirHoja, cerrarHoja, type Hoja } from "./hoja";
+import { abrirHoja, cerrarHoja, guardaDeCierre, type Hoja } from "./hoja";
 
 const pesos = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 });
 const fecha = new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short" });
@@ -471,6 +471,14 @@ export function abrirEntrar(continuar?: () => void, aviso?: string, correo = "")
       al: {
         submit: (e) => {
           e.preventDefault();
+          const faltan = [
+            ...(correoIn.value.trim() ? [] : [{ campo: "correo", mensaje: "Escribe tu correo." }]),
+            ...(clave.value ? [] : [{ campo: "contrasena", mensaje: "Escribe tu contraseña." }]),
+          ];
+          if (faltan.length) {
+            marcarErrores(form, faltan);
+            return;
+          }
           void conCaptcha("Entrando…", async (token) => {
             await prepararSesion();
             await cuenta.entrar(correoIn.value, clave.value, token);
@@ -513,7 +521,11 @@ export function abrirEntrar(continuar?: () => void, aviso?: string, correo = "")
 
 // ------------------------------------------------------------ registro
 export async function abrirRegistro(continuar?: () => void) {
-  const hoja = abrirHoja({ etiqueta: "Crear cuenta", clase: "hoja-angosta" });
+  // Pantalla completa y con guarda: un toque fuera, Esc o "Atrás" ya no
+  // borran lo que escribió sin preguntar.
+  let escribioAlgo = () => false;
+  const noSalirSinQuerer = () => !escribioAlgo() || window.confirm("¿Salir sin crear tu cuenta? Se borrará lo que escribiste.");
+  const hoja = abrirHoja({ etiqueta: "Crear cuenta", clase: "hoja-completa", antesDeCerrar: noSalirSinQuerer });
   hoja.pintar(...encabezado("Crear cuenta"), h("p", { clase: "cta-texto" }, "Cargando…"));
   await prepararSesion();
   let canales: { id: number; nombre: string }[] = [];
@@ -544,6 +556,7 @@ export async function abrirRegistro(continuar?: () => void) {
   canal.addEventListener("change", sincronizarDetalle);
   sincronizarDetalle();
   const acepta = h("input", { type: "checkbox" });
+  escribioAlgo = () => [nombre, telefono, correoIn, clave, repetir].some((x) => x.value.trim() !== "");
   const error = errorGeneral();
   const boton = h("button", { clase: "boton boton-oscuro boton-ancho", type: "submit" }, "Crear mi cuenta");
   const cajaCaptcha = h("div", { clase: "captcha" });
@@ -573,17 +586,20 @@ export async function abrirRegistro(continuar?: () => void) {
             // los errores de los campos se ven antes de gastar la verificación
             const problemas = validarRegistro(datos);
             if (problemas.length) throw new ErrorDeValidacion(problemas);
-            const token = await captcha.token();
             let r: { requiereConfirmacion: boolean };
             try {
+              const token = await captcha.token();
               r = await cuenta.registrar(datos, volverAqui(), token);
             } catch (e) {
               captcha.reiniciar();
               throw e;
             }
+            // la cuenta ya se creó: cerrar ya no pierde nada
+            guardaDeCierre(null);
             if (r.requiereConfirmacion) {
               // "Corrígelo" regresa a este mismo formulario, con todo lo que ya escribió
               pintarConfirmacion(hoja, correoIn.value.trim().toLowerCase(), continuar, true, () => {
+                guardaDeCierre(noSalirSinQuerer);
                 pintarFormulario();
                 captcha.reiniciar();
                 correoIn.focus();
@@ -652,6 +668,12 @@ export async function abrirRegistro(continuar?: () => void) {
   );
   const pintarFormulario = () =>
     hoja.pintar(
+      h(
+        "div",
+        { clase: "cta-barra-completa" },
+        h("button", { type: "button", clase: "enlace cta-volver", al: { click: cerrarHoja } }, "← Volver a la tienda"),
+        h("span", { clase: "cta-marca" }, "Coco & Cuero"),
+      ),
       ...encabezado("Crear cuenta", `Recibes tu número de cliente, apartas en línea y te llevas ${PORCENTAJE} de descuento en tu primera compra.`),
       form,
       h("p", { clase: "cta-cambio" }, "¿Ya tienes cuenta? ", h("button", { type: "button", clase: "enlace", al: { click: () => abrirEntrar(continuar) } }, "Entra")),

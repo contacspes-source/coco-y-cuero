@@ -30,7 +30,8 @@ interface Turnstile {
       sitekey: string;
       callback: (token: string) => void;
       "expired-callback"?: () => void;
-      "error-callback"?: () => void;
+      /** devolver true evita que Turnstile muestre su propio error */
+      "error-callback"?: () => boolean | void;
       theme?: "light" | "dark" | "auto";
       language?: string;
       appearance?: "always" | "execute" | "interaction-only";
@@ -101,8 +102,12 @@ export function montarCaptcha(contenedor: HTMLElement): Captcha {
   let tokenListo: string | null = null;
   let esperando: { resolver: (t: string) => void; rechazar: (e: Error) => void }[] = [];
   let fallo: Error | null = null;
+  let reintentos = 0;
 
   const entregar = (t: string) => {
+    // un token nuevo borra cualquier error anterior: Turnstile se recupera
+    // solo (reintenta) y antes el formulario seguía "atorado" en el error
+    fallo = null;
     tokenListo = t;
     esperando.forEach((e) => e.resolver(t));
     esperando = [];
@@ -123,7 +128,18 @@ export function montarCaptcha(contenedor: HTMLElement): Captcha {
         "expired-callback": () => {
           tokenListo = null;
         },
-        "error-callback": () => fallar(new ErrorDeCaptcha()),
+        // si la librería ya está y el widget falló, se pide uno nuevo en vez
+        // de dejar el formulario sin salida; si vuelve a fallar, se avisa
+        "error-callback": () => {
+          if (reintentos < 1 && id) {
+            reintentos++;
+            tokenListo = null;
+            void listo.then((ts) => id && ts.reset(id)).catch(() => {});
+            return true; // le dice a Turnstile que ya lo manejamos
+          }
+          fallar(new ErrorDeCaptcha());
+          return true;
+        },
       });
       return ts;
     })
@@ -134,8 +150,15 @@ export function montarCaptcha(contenedor: HTMLElement): Captcha {
 
   return {
     token() {
-      if (fallo) return Promise.reject(fallo);
       if (tokenListo) return Promise.resolve(tokenListo);
+      // falló antes: se intenta de nuevo al pedirlo, en vez de rechazar para siempre
+      if (fallo && id) {
+        fallo = null;
+        reintentos = 0;
+        void listo.then((ts) => id && ts.reset(id)).catch(() => {});
+      } else if (fallo) {
+        return Promise.reject(fallo);
+      }
       return new Promise<string>((resolver, rechazar) => {
         const reloj = setTimeout(() => {
           esperando = esperando.filter((e) => e.resolver !== resolver);
@@ -151,6 +174,7 @@ export function montarCaptcha(contenedor: HTMLElement): Captcha {
     reiniciar() {
       tokenListo = null;
       fallo = null;
+      reintentos = 0;
       void listo.then((ts) => id && ts.reset(id)).catch(() => {});
     },
     quitar() {
