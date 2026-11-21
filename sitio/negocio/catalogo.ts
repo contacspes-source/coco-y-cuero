@@ -567,3 +567,23 @@ export function siguienteCambio(r: Rotacion): { lugar: number; entra: number; ro
   mostrados[lugar] = entra;
   return { lugar, entra, rotacion: { mostrados, cola: [...resto, sale], paso: r.paso + 1 } };
 }
+
+// ------------------------------------------------------------------
+// Catálogo por partes ("Ver más")
+// ------------------------------------------------------------------
+
+/** Cuántos perfumes se muestran de entrada y en cada "Ver más". */
+export const POR_PAGINA = 24;
+
+/** Qué parte de la lista mostrar y cuántos faltan, con un tope de `mostrar`. */
+export function porPartes<T>(lista: readonly T[], mostrar: number): { visibles: T[]; faltan: number } {
+  const tope = Math.max(0, Math.floor(mostrar));
+  const visibles = lista.slice(0, tope);
+  return { visibles, faltan: lista.length - visibles.length };
+}
+
+/** El texto del botón: "Ver 24 más" o, al final, "Ver los últimos 7". */
+export function textoVerMas(faltan: number, porPagina = POR_PAGINA): string {
+  if (faltan <= porPagina) return faltan === 1 ? "Ver el último perfume" : `Ver los últimos ${faltan}`;
+  return `Ver ${porPagina} más`;
+}

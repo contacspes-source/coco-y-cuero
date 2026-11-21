@@ -866,6 +866,8 @@ a:focus-visible, button:focus-visible, input:focus-visible{
 }
 .marca:hover{background:rgba(255,255,255,.08);border-color:rgba(201,168,136,.55);transform:translateY(-2px)}
 .marca:focus-visible{outline:2px solid var(--caramelo);outline-offset:2px}
+/* el logo del encabezado también se llama .marca: sin el estilo de ficha de marca (se veía un recuadro encima de la portada) */
+.encabezado .marca{flex-direction:row;gap:12px;min-width:0;height:auto;padding:0;border:0;border-radius:0;background:none;color:inherit;transform:none}
 .marca-caja{display:flex;align-items:center;justify-content:center;height:58px}
 .marca-logo{
   display:block;flex:none;background:currentColor;
@@ -1136,3 +1138,66 @@ a:focus-visible, button:focus-visible, input:focus-visible{
 .campo-asterisco{color:var(--cuero)}
 .cta-obligatorios{margin:0 0 -4px;font-size:12.5px}
 .campo[hidden]{display:none}
+
+/* ===========================================================
+   Celular: perfumes primero. Todo lo de arriba se compacta para
+   que quien llega desde un anuncio vea frascos en la primera
+   pantalla y llegue rápido al catálogo.
+   =========================================================== */
+@media (max-width:620px){
+  /* un solo aviso de cuenta: si la franja está visible, el botón de arriba sobra */
+  .promo{padding:7px 44px 7px 14px;font-size:12.5px;gap:4px 12px}
+  .promo-enlace{display:none}
+  .promo:not([hidden]) ~ .encabezado .cuenta-crear{display:none}
+  .cabecera{height:62px}
+  .marca-sello{width:40px;height:40px}
+  .barra-fija{top:62px}
+
+  /* carrusel más bajo */
+  .diapo{padding:18px 0 58px}
+  .diapo-caja{gap:16px}
+  .diapo-rotulo{margin-bottom:10px;font-size:11.5px}
+  .diapo-titulo{font-size:34px;margin-bottom:12px}
+  .diapo-entrada{font-size:14px;line-height:1.45;margin-bottom:14px}
+  .diapo-boton{padding:12px 24px;font-size:16px}
+  .arte-frascos,.arte-numero,.arte-sello{height:130px}
+  .numero-grande{font-size:110px}
+  .sello{width:120px}
+  .sello strong{font-size:36px}
+  .arte-pasos li,.arte-pago li{padding:10px 8px}
+  .arte-pasos span:last-child,.arte-pago span{display:none}
+  .arte-mapa{gap:12px}
+  .carrusel-controles{bottom:12px}
+
+  /* beneficios: una sola fila que se desliza */
+  .beneficios-lista{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;gap:22px;padding-top:12px;padding-bottom:12px}
+  .beneficios-lista::-webkit-scrollbar{display:none}
+  .beneficios-lista li{flex:none;align-items:center;scroll-snap-align:start}
+  .beneficios-lista small{display:none}
+
+  /* vitrina más compacta: buscador y frascos a la vista */
+  .vitrina{padding:24px 0 12px}
+  .vitrina-rotulo{margin-bottom:10px}
+  .vitrina-titulo{font-size:34px;margin-bottom:16px}
+  .vitrina-caja{gap:14px}
+}
+
+/* ------------------------------------------- botón flotante de WhatsApp */
+.wa-flotante{
+  position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:28;
+  display:inline-flex;align-items:center;gap:10px;height:56px;padding:0 20px 0 16px;border-radius:999px;
+  background:#1f8f4e;color:#fff;text-decoration:none;font-family:var(--display);font-size:16.5px;letter-spacing:.02em;
+  box-shadow:0 10px 30px rgba(46,31,22,.28);transition:transform .18s ease,background .18s ease;
+}
+.wa-flotante:hover{background:#187a41;transform:translateY(-2px)}
+.wa-flotante svg{width:26px;height:26px;flex:none;fill:currentColor}
+.con-hoja .wa-flotante{display:none}
+@media (max-width:620px){
+  .wa-flotante{right:14px;height:54px;padding:0 15px}
+  .wa-flotante-texto{display:none}
+}
+
+/* --------------------------------------------- "ver más" del catálogo */
+.ver-mas{display:flex;flex-direction:column;align-items:center;gap:10px;margin:34px 0 10px}
+.ver-mas[hidden]{display:none}
+.ver-mas small{font-size:13px;color:var(--tinta-suave)}

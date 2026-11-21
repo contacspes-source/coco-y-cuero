@@ -32,6 +32,7 @@ import {
 import { cuenta, enlaceAlAbrir } from "../negocio/servicio";
 import { CIUDADES, DESCUENTO_BIENVENIDA, OTRA_CIUDAD } from "../negocio/tienda";
 import { linkWhatsApp } from "./config";
+import { medirApartado } from "./medicion";
 import { abrirHoja, cerrarHoja, guardaDeCierre, type Hoja } from "./hoja";
 
 const pesos = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 });
@@ -121,8 +122,8 @@ function pintarPromo() {
       h(
         "p",
         null,
-        h("strong", null, "¿Ya iniciaste sesión? "),
-        `Crea tu cuenta y llévate ${PORCENTAJE} de descuento en tu primera compra.`,
+        h("strong", null, `${PORCENTAJE} de descuento `),
+        "en tu primera compra al crear tu cuenta.",
       ),
       h(
         "div",
@@ -1024,6 +1025,7 @@ export async function abrirApartar(p: PerfumePublico, pr: PerfumePublico["presen
           e.preventDefault();
           void manejar(form, error, boton, "Enviando…", async () => {
             const id = await cuenta.apartar(pr.id, ciudad.value || null, notas.value, direccion.leer(), aDomicilio.checked);
+            medirApartado(p, pr.ml, pr.precio, id);
             if (conDescuento) {
               descuento = 0;
               actualizarBoton();

@@ -137,3 +137,15 @@ Algunas redes (escuelas, oficinas, bloqueadores de anuncios, filtros de DNS) blo
 | `/fotos/<archivo>` | Trae la foto del bucket `perfumes` (copia por un año; cada foto tiene nombre único) |
 
 Todo lo demás lo sirve Cloudflare directo desde `dist/`, sin ejecutar el Worker. Si algo falla, el sitio intenta Supabase directo y luego `catalogo-respaldo.json`; si nada responde, muestra "Reintentar" y abajo, en letra chica, qué falló (útil si alguien te manda captura).
+
+## Medición de ventas
+
+`sitio/presentacion/medicion.ts` manda estos eventos a Google Tag Manager (`dataLayer`) y al píxel de Meta (`fbq`), si están cargados. Nunca manda nombre, correo ni teléfono.
+
+| Qué pasó | GTM / Google Analytics 4 | Meta |
+| --- | --- | --- |
+| Abrió el detalle de un perfume | `view_item` | `ViewContent` |
+| Tocó cualquier botón de WhatsApp (`origen`: tarjeta, detalle, wa-flotante…) | `clic_whatsapp` | `Contact` |
+| Apartó un perfume con su cuenta | `generate_lead` | `Lead` |
+
+Para verlos en Google Analytics, en GTM crea una etiqueta "Evento de GA4" por cada nombre con un activador de "Evento personalizado".

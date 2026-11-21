@@ -35,6 +35,9 @@ import {
   sugerenciasDeBusqueda,
   iniciarRotacion,
   siguienteCambio,
+  POR_PAGINA,
+  porPartes,
+  textoVerMas,
   type Rotacion,
   type Filtros,
   type Orden,
@@ -47,6 +50,7 @@ import { abrirApartar, abrirRegistro, estadoBienvenida, iniciarCuenta } from "./
 import { vistaDetalle } from "./detalle";
 import { iniciarPortada } from "./portada";
 import { abrirHoja, cerrarHoja, hojaAbierta } from "./hoja";
+import { medirClicsWhatsApp, medirVerPerfume } from "./medicion";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -83,6 +87,9 @@ const filtrosFila = $("filtros-fila");
 const barraFija = $("barra-fija");
 const barraFijaTexto = $("barra-fija-texto");
 const barraFijaChips = $("barra-fija-chips");
+const verMas = $("ver-mas");
+const verMasBoton = $<HTMLButtonElement>("ver-mas-boton");
+const verMasTexto = $("ver-mas-texto");
 const SEMILLA = semillaDelDia(new Date());
 
 let perfumes: PerfumePublico[] = [];
@@ -124,6 +131,7 @@ function abrirDetalle(p: PerfumePublico, empujar = true) {
     },
   });
   document.title = `${p.nombre} · ${p.marca} · Coco & Cuero`;
+  medirVerPerfume(p);
   hoja.pintar(
     vistaDetalle(p, perfumes, {
       apartar: (perfume, presentacion) => void abrirApartar(perfume, presentacion, () => abrirDetalle(perfume, false)),
@@ -214,8 +222,16 @@ function esqueleto(): HTMLElement[] {
 /** Hasta que llega el catálogo no se pinta nada (si no, se verían ceros). */
 let cargado = false;
 
+/**
+ * Cuántos perfumes se ven. En celular, 245 juntos son decenas de
+ * pantallas; se muestran de 24 en 24 con "Ver más". Cambiar un filtro
+ * o el orden vuelve a empezar.
+ */
+let mostrar = POR_PAGINA;
+
 function cambiar(parcial: Partial<Filtros>) {
   filtros = { ...filtros, ...parcial };
+  mostrar = POR_PAGINA;
   history.replaceState(null, "", `${location.pathname}${escribirFiltros(filtros)}${location.hash}`);
   if (cargado) pintar();
 }
@@ -739,7 +755,9 @@ function pintar() {
   pintarControles();
   const visibles = filtrar(perfumes, filtros);
   rejilla.setAttribute("aria-busy", "false");
-  vaciar(rejilla, ...visibles.map(tarjeta));
+  const parte = porPartes(visibles, mostrar);
+  vaciar(rejilla, ...parte.visibles.map(tarjeta));
+  pintarVerMas(parte.visibles.length, parte.faltan);
 
   const n = visibles.length;
   conteo.textContent = `· ${perfumes.length} perfumes`;
@@ -756,6 +774,23 @@ function pintar() {
   vacio.hidden = n > 0;
   vacioTexto.textContent = "No tenemos ese perfume en el catálogo todavía.";
 }
+
+function pintarVerMas(vistos: number, faltan: number) {
+  verMas.hidden = faltan === 0;
+  verMasBoton.textContent = textoVerMas(faltan);
+  verMasTexto.textContent = `Llevas ${vistos} de ${vistos + faltan}`;
+}
+
+// "Ver más" agrega tarjetas al final sin volver a pintar las de arriba,
+// así la página no brinca y el foco sigue en el botón.
+verMasBoton.addEventListener("click", () => {
+  const visibles = filtrar(perfumes, filtros);
+  const antes = Math.min(mostrar, visibles.length);
+  mostrar += POR_PAGINA;
+  const parte = porPartes(visibles, mostrar);
+  rejilla.append(...parte.visibles.slice(antes).map(tarjeta));
+  pintarVerMas(parte.visibles.length, parte.faltan);
+});
 
 // ------------------------------------------------------------ eventos
 let espera: number | undefined;
@@ -778,6 +813,12 @@ limpiar.addEventListener("click", () => {
 
 // enlaces generales
 const saludo = "Hola, vengo de la página de Coco & Cuero. Quisiera preguntar por un perfume.";
+// botón flotante: siempre a la mano, salvo con el detalle abierto (ahí ya hay uno)
+const waFlotante = $<HTMLAnchorElement>("wa-flotante");
+waFlotante.prepend(iconoWhatsApp());
+waFlotante.href = linkWhatsApp("Hola, vengo de la página de Coco & Cuero. ¿Me ayudan a elegir un perfume?");
+medirClicsWhatsApp();
+
 for (const id of ["wa-portada", "wa-originales", "wa-pie", "wa-vacio"]) {
   const a = document.getElementById(id) as HTMLAnchorElement | null;
   if (!a) continue;
