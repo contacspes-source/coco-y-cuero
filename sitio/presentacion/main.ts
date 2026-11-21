@@ -925,6 +925,23 @@ const actualizarBarra = () => {
 new IntersectionObserver(([e]) => { filtrosVisibles = e!.isIntersecting; actualizarBarra(); }).observe(filtrosFila);
 new IntersectionObserver(([e]) => { rejillaVisible = e!.isIntersecting; actualizarBarra(); }, { rootMargin: "0px 0px -40% 0px" }).observe(rejilla);
 
+// ------------------------------------------------------------ encabezado en el celular
+// En pantallas chicas el encabezado se esconde al bajar (deja más espacio
+// para ver perfumes) y regresa en cuanto subes un poco.
+const pantallaChica = matchMedia("(max-width: 620px)");
+let ultimaY = window.scrollY;
+window.addEventListener(
+  "scroll",
+  () => {
+    const y = window.scrollY;
+    if (Math.abs(y - ultimaY) < 6) return; // ignora temblores del dedo
+    const bajando = y > ultimaY;
+    document.documentElement.classList.toggle("encabezado-oculto", pantallaChica.matches && bajando && y > 160);
+    ultimaY = y;
+  },
+  { passive: true },
+);
+
 // ------------------------------------------------------------ cuenta
 void iniciarCuenta(
   $<HTMLButtonElement>("cuenta-boton"),

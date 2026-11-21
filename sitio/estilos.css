@@ -65,7 +65,7 @@ img{display:block}
   border-bottom:1px solid var(--linea);
 }
 .cabecera{display:flex;align-items:center;justify-content:space-between;height:74px;gap:20px}
-.marca{display:flex;align-items:center;gap:12px;text-decoration:none}
+.marca-sitio{display:flex;align-items:center;gap:12px;text-decoration:none}
 .marca-sello{width:46px;height:46px;object-fit:contain}
 .marca-texto{font-family:var(--display);font-size:21px;letter-spacing:.04em}
 .cabecera-nav{display:flex;gap:30px;font-family:var(--display);font-size:16.5px;letter-spacing:.03em}
@@ -866,8 +866,6 @@ a:focus-visible, button:focus-visible, input:focus-visible{
 }
 .marca:hover{background:rgba(255,255,255,.08);border-color:rgba(201,168,136,.55);transform:translateY(-2px)}
 .marca:focus-visible{outline:2px solid var(--caramelo);outline-offset:2px}
-/* el logo del encabezado también se llama .marca: sin el estilo de ficha de marca (se veía un recuadro encima de la portada) */
-.encabezado .marca{flex-direction:row;gap:12px;min-width:0;height:auto;padding:0;border:0;border-radius:0;background:none;color:inherit;transform:none}
 .marca-caja{display:flex;align-items:center;justify-content:center;height:58px}
 .marca-logo{
   display:block;flex:none;background:currentColor;
@@ -1138,6 +1136,44 @@ a:focus-visible, button:focus-visible, input:focus-visible{
 .campo-asterisco{color:var(--cuero)}
 .cta-obligatorios{margin:0 0 -4px;font-size:12.5px}
 .campo[hidden]{display:none}
+
+/* ===========================================================
+   Celular: más espacio para los perfumes y botones fáciles de tocar
+   =========================================================== */
+.encabezado{transition:transform .25s ease}
+.barra-fija{transition:top .25s ease}
+/* al bajar por la página el encabezado se esconde; al subir regresa (main.ts) */
+html.encabezado-oculto .encabezado{transform:translateY(-100%)}
+html.encabezado-oculto .barra-fija{top:0}
+
+@media (max-width:620px){
+  /* iOS hace zoom si un campo tiene letra menor a 16px: así no brinca la página */
+  input:not([type=checkbox]):not([type=radio]),select,textarea{font-size:16px}
+
+  /* botones de al menos 44px, el tamaño cómodo para un dedo */
+  .promo-cerrar{width:44px;height:44px;right:2px}
+  .circulo{width:44px;height:44px}
+  .carrusel-punto{height:36px}
+  .carrusel-punto::before,.carrusel-punto span{top:17px}
+  .pie-enlaces a{display:inline-block;padding:10px 0;margin-right:18px}
+
+  /* detalle: la foto ya no ocupa toda la pantalla y el precio se ve al abrir */
+  .det-foto{aspect-ratio:auto;height:min(42dvh,340px)}
+  .det-foto img{position:absolute;inset:0}
+  /* Apartar y WhatsApp siempre a la mano, pegados abajo mientras lees:
+     van al final de la columna y "sticky" los mantiene a la vista */
+  .det-info{display:flex;flex-direction:column}
+  .det-acciones{
+    order:99;position:sticky;bottom:0;z-index:3;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;
+    margin:24px -20px -40px;padding:12px 20px calc(12px + env(safe-area-inset-bottom,0px));
+    background:rgba(248,241,232,.96);backdrop-filter:blur(8px);border-top:1px solid var(--linea);
+  }
+  .det-acciones .boton{padding:13px 10px;font-size:15.5px}
+  .det-wa svg{flex:none}
+}
+@media (max-width:420px){
+  .det-wa-pedir{display:none}
+}
 
 /* ===========================================================
    Celular: perfumes primero. Todo lo de arriba se compacta para
