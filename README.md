@@ -51,12 +51,12 @@ npm install          # una sola vez
 npm run dev          # sitio en http://localhost:5174/
 npm run dev:panel    # panel en http://localhost:5173/panel/
 npm test             # 324 pruebas
-npm run build        # revisa tipos, compila y arma dist/
+npm run build        # revisa tipos, corre pruebas, compila y arma dist/
 ```
 
 ## Publicar
 
-`git push` a `main`. Cloudflare corre `npm run build` y publica la carpeta `dist/`. Si la compilación o los tipos fallan, no se publica nada y el sitio anterior sigue en línea.
+Fusiona un PR a `main` (con la regla de GitHub activa ya no se puede hacer `git push` directo). Cloudflare corre `npm run build` y publica la carpeta `dist/`. Si los tipos, las pruebas o la compilación fallan, no se publica nada y el sitio anterior sigue en línea.
 
 ## Calidad
 

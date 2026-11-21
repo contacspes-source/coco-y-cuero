@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite --config sitio/vite.config.ts",
     "dev:panel": "vite --config panel/vite.config.ts",
-    "build": "npm run verificar && npm run compilar",
+    "build": "npm run verificar && npm test && npm run compilar",
     "compilar": "vite build --config sitio/vite.config.ts && vite build --config panel/vite.config.ts && node scripts/finalizar.mjs",
     "verificar": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
