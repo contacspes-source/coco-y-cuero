@@ -55,7 +55,8 @@ export function vistaDetalle(p: PerfumePublico, todos: PerfumePublico[], acc: Ac
     "a",
     { clase: "boton boton-linea det-wa", target: "_blank", rel: "noopener" },
     iconoWhatsApp(),
-    "Pedir por WhatsApp",
+    // en celulares angostos solo cabe "WhatsApp"
+    h("span", null, h("span", { clase: "det-wa-pedir" }, "Pedir por "), "WhatsApp"),
   );
   const apartar = h(
     "button",
